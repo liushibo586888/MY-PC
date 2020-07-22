@@ -1,0 +1,331 @@
+<template>
+  <div class="container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <!-- <i-col span="3">
+            <formItem prop="StartDate">
+              <DatePicker type="month" placeholder="开始日期" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="EndDate">
+              <DatePicker type="month" placeholder="结束日期" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col> -->
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="21">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+              <Button type="success" class="btn btn-search" @click="tianjia">添加</Button>
+              <Button type="error" class="btn btn-reset" @click="xiugai">修改</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row ref="mainTable" @on-row-click="getRowID"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <!-- 修改弹窗 -->
+    <Modal :mask-closable="false" v-model="modal" width="800" class="dialog">
+      <div slot='close' class="close not-print" @click="quXiao">
+        <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+      </div>
+      <Form ref="formValidate1" :model="formValidate" :label-width="100" @submit.native.prevent class="form">
+        <row type="flex" style="margin-right:30px">
+          <i-col span="24">
+            <FormItem prop="StoreName" label="门店名称:">
+              <Input v-model="formValidate.StoreName" placeholder="无" :disabled="true"></Input>
+            </FormItem>
+          </i-col>
+        </row>
+
+        <row type="flex" style="margin-right:30px">
+          <i-col span="24">
+            <FormItem prop="payList" label="支付方式：" :label-width="120">
+              <Select v-model="formValidate.payList" multiple>
+                <Option v-for="item in payList" :value="item.ID" :key="item.ID">{{ item.PayModeName }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </row>
+      </Form>
+      <div slot="footer" class="footer not-print">
+        <Button class="btn" type="primary" @click="baoCun" :loading="onLoading">保存</Button>
+        <Button class="btn" type="warning" @click="quXiao" :loading="onLoading">取消</Button>
+      </div>
+    </Modal>
+
+    <!-- 添加弹窗 -->
+    <Modal :mask-closable="false" v-model="modal1" width="700" class="dialog">
+      <div slot='close' class="close not-print" @click="quXiaoTJ">
+        <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+      </div>
+      <Form ref="formValidateTJ" :model="formValidateTJ" :label-width="100" @submit.native.prevent class="form">
+        <row type="flex" style="margin-right:30px">
+          <i-col span="24">
+            <FormItem prop="payList" label="支付方式：" :label-width="120">
+              <Select v-model="formValidateTJ.payList" multiple>
+                <Option v-for="item in payList" :value="item.ID" :key="item.ID">{{ item.PayModeName }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </row>
+      </Form>
+      <div slot="footer" class="footer not-print">
+        <Button class="btn" type="primary" @click="baoCunTJ" :loading="onLoading">保存</Button>
+        <Button class="btn" type="warning" @click="quXiaoTJ" :loading="onLoading">取消</Button>
+      </div>
+    </Modal>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      onLoading: false,
+      tableLoading: true,
+      modal: false, //修改
+      modal1: false, //添加
+      rowID: "",
+      formValidate: {
+        StoreId: "",
+        StoreName: "",
+        payList: []
+      },
+      formValidateTJ: {
+        StoreId: "",
+        StoreName: "",
+        payList: []
+      },
+      formItem: {
+        StoreID: null,
+        EmployeeID: "",
+        store: ""
+      },
+      columns1: [
+        {
+          title: "门店",
+          key: "store",
+          align: "center"
+        },
+        {
+          title: "支付方式类型",
+          key: "Name",
+          align: "center"
+        },
+
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      storeList: [],
+      payList: [],
+      PList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    tianjia() {
+      let that = this;
+      that.modal1 = true;
+    },
+    baoCunTJ() {
+      var temp = [];
+      let that = this;
+      that.onLoading = true;
+      for (let i = 0; i < that.payList.length; i++) {
+        for (let j = 0; j < that.formValidateTJ.payList.length; j++) {
+          var selectId = that.formValidateTJ.payList[j];
+          if (selectId === that.payList[i].ID) {
+            var t = {
+              Id: selectId,
+              Name: that.payList[i].PayModeName,
+              IsDefault: false
+            };
+            temp.push(t);
+          }
+        }
+      }
+
+      let data = {
+        StoreId: that.formItem.StoreID,
+        list: temp
+      };
+      api.addPayMode(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("添加成功");
+          that.getList();
+          that.onLoading = false;
+          that.quXiaoTJ();
+        } else {
+          that.$Message.error(response.error_message);
+          that.onLoading = false;
+          //   that.quXiaoTJ();
+        }
+      });
+    },
+    quXiaoTJ() {
+      let that = this;
+      that.$refs.formValidateTJ.resetFields();
+      that.modal1 = false;
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.Id;
+    },
+    xiugai() {
+      let that = this;
+      that.modal = true;
+      let data = {
+        StoreId: that.formItem.StoreID,
+      };
+      api.PerformanceTargetgetModel(data).then(response => {
+        if (response.error_code === "Success") {
+          that.setData(response.data);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.StoreName = res.StoreName;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      // 两者同时存在
+      if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+        that.$Message.error("开始日期不得大于结束日期");
+        return false;
+      }
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    quXiao() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal = false;
+    },
+    baoCun() {
+      let that = this;
+      that.onLoading = true;
+      let data = {
+        Id: that.rowID,
+        StoreId: that.formValidate.StoreId
+      };
+      api.PerformanceTargetEdit(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.getList();
+          that.onLoading = false;
+          that.quXiao();
+        } else {
+          that.$Message.error(response.error_message);
+          that.onLoading = false;
+        }
+      });
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StoreId: that.formItem.StoreID
+        };
+        that.tableLoading = true;
+        api.PaymentList(data).then(response => {
+          if (response.error_code === "Success") {
+            that.list = response.data;
+            for (let i = 0; i < that.list.length; i++) {
+              that.list[i]["store"] = that.formItem.store;
+            }
+            that.tableLoading = false;
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let arr = [];
+      api.getValidStores().then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.store = that.userMes.StoreName;
+          that.formItem.StoreID = that.userMes.StoreID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取支付方式
+    getPayList() {
+      let that = this;
+      let arr = [];
+      let data = {
+        Name: "",
+        Valid: true
+      };
+      api.getPayModeList(data).then(response => {
+        if (response.error_code === "Success") {
+          that.payList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    choose(name, id) {
+      this.formItem.store = name;
+      this.formItem.StoreID = id;
+    },
+    chooseTJ(name, id) {
+      let that = this;
+      that.formValidateTJ.StoreName = name;
+      that.formValidateTJ.StoreId = id;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.getList();
+      that.getStore();
+      that.getPayList();
+    });
+  }
+};
+</script>
+<style>
+</style>
+
+

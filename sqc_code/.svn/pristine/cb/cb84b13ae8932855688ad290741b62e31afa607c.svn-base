@@ -1,0 +1,624 @@
+<template>
+    <div class="khgl-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="StartDate">
+
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.StartDate" :clearable="false"
+                                :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="EndDate">
+
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.EndDate" :clearable="false"
+                                :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="RequestType">
+                            <Select v-model="formItem.RequestType" placeholder="搜索类型">
+                                <Option :value="0">全部</Option>
+                                <Option :value="1">按到店日期搜索</Option>
+                                <Option :value="2">按登记日期搜索</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="CustomerName">
+                            <Input v-model="formItem.CustomerName" placeholder="姓名"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="CustomerPhone">
+                            <Input v-model="formItem.CustomerPhone" placeholder="电话"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="9">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn btn-search" @click="searchList" :loading="loading">搜索</Button>
+                            <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+                            <Button type="warning" class="btn btn-purple" @click="lookDetail" v-if="showDetail" :disabled="!rowID">客户详情</Button>
+                            <Dropdown transfer @on-click="addPoups" v-if="shortcutMenuIndex > 0">
+                                <Button type="primary" class="btn btn-add" :disabled="!rowPhone">
+                                    快捷菜单
+                                </Button>
+                                <DropdownMenu slot="list">
+                                    <DropdownItem name="0" :disabled="!rowPhone" v-if="canAddXmqz">开单</DropdownItem>
+                                    <DropdownItem name="1" :disabled="!rowPhone" v-if="canAddComeLog">到店登记</DropdownItem>
+                                    <DropdownItem name="2" :disabled="!rowPhone" v-if="canAddZxjl">添加咨询记录</DropdownItem>
+                                    <DropdownItem name="3" :disabled="!rowPhone" v-if="canAddYygn">添加预约</DropdownItem>
+                                    <DropdownItem name="4" :disabled="!rowPhone" v-if="canAddTrackPlan">添加追踪计划</DropdownItem>
+                                    <DropdownItem name="5" :disabled="!rowPhone" v-if="canAddTrackRecord">添加常规追踪</DropdownItem>
+                                    <DropdownItem name="6" :disabled="!rowPhone" v-if="canAddArrearsRecovery">欠款回收</DropdownItem>
+                                </DropdownMenu>
+                            </Dropdown>
+                            <!-- <Button type="primary" class="btn btn-add" disabled v-else>快捷菜单</Button> -->
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" :height="setTableHeight" ref="mainTable" stripe @on-current-change="getRowID" @on-row-dblclick="lookDetail"
+                highlight-row></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      shortcutMenuIndex: 0,
+      canAddXmqz: false,
+      canAddYygn: false,
+      canAddZxjl: false,
+      canAddComeLog: false,
+      canAddTrackPlan: false,
+      canAddTrackRecord: false,
+      canAddArrearsRecovery: false,
+      showDetail: false,
+      rowID: "",
+      rowPhone: null,
+      loading: false,
+      tableLoading: false,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 0,
+      modal1: false,
+      modal2: false,
+      formItem: {
+        StartDate: new Date(),
+        EndDate: new Date(),
+        CustomerPhone: "",
+        CustomerName: "",
+        RequestType: ""
+      },
+      columns1: [
+        {
+          title: "客户登记日期",
+          key: "RegistDate",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.RegistDate) {
+              return "";
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.RegistDate).format("YYYY-MM-DD HH:mm:ss")
+            );
+          }
+        },
+        {
+          title: "客户姓名",
+          key: "Name",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "客户状态",
+          key: "CustomerStatusText",
+          width: 100,
+          align: "center"
+        },
+        {
+          title: "电话",
+          key: "Phone",
+          width: 140,
+          align: "center"
+          // ,
+          // render: (h, params) => {
+          //     if (!params.row.Phone) {
+          //         return ''
+          //     }
+          //     let tel = params.row.Phone.substring(0, 3) + '****' + params.row.Phone.substring(-1, 4)
+          //     return tel
+          // }
+        },
+        {
+          title: "年龄",
+          key: "Age",
+          width: 70,
+          align: "center"
+        },
+        {
+          title: "性别",
+          key: "Sex",
+          width: 70,
+          align: "center"
+        },
+        {
+          title: "门店名称",
+          key: "StoreName",
+          width: 160,
+          align: "center"
+        },
+        {
+          title: "首次来院日期",
+          key: "FirstComeDate",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.FirstComeDate) {
+              return "";
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.FirstComeDate).format("YYYY-MM-DD HH:mm:ss")
+            );
+          }
+        },
+        {
+          title: "最近来院日期",
+          key: "LatestComeDate",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.LatestComeDate) {
+              return "";
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.LatestComeDate).format("YYYY-MM-DD HH:mm:ss")
+            );
+          }
+        },
+        {
+          title: "登记人",
+          key: "RegisterName",
+          width: 100,
+          align: "center"
+        },
+        {
+          title: "了解途径",
+          key: "UnderstandWayName",
+          width: 100,
+          align: "center"
+        },
+        {
+          title: "来源渠道",
+          key: "ChannelName",
+          width: 100,
+          align: "center"
+        },
+        {
+          title: "门店总监",
+          key: "SceneEmployeeName",
+          width: 100,
+          align: "center"
+        },
+        {
+          title: "美容师",
+          key: "BeauticianEmployeeName",
+          width: 90,
+          align: "center"
+        },
+        {
+          title: "网络来源",
+          key: "NetSourceName",
+          width: 100,
+          align: "center"
+        },
+        {
+          title: "备注",
+          key: "Remark",
+          width: 100,
+          align: "center",
+          render: (h, parmas) => {
+            if (!parmas.row.Remark) {
+              return "";
+            }
+            let text =
+              parmas.row.Remark.length > 8
+                ? parmas.row.Remark.substr(0, 7) + "..."
+                : parmas.row.Remark;
+            return h(
+              "div",
+              {
+                on: {
+                  click: () => {
+                    this.$Modal.success({
+                      title: "提示",
+                      Remark: parmas.row.Remark
+                    });
+                  }
+                }
+              },
+              text
+            );
+          }
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      list: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    setShortcutMenuAuthor() {
+      let that = this;
+      //项目确诊单(快捷菜单权限验证)
+      let list1 = that.authorList["xmqz"];
+      if (list1) {
+        for (let i of list1) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddXmqz = i.IsVisible;
+          }
+        }
+      } else {
+      }
+      //预约(快捷菜单权限验证)
+      let list2 = that.authorList["yygn"];
+      if (list2) {
+        for (let i of list2) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddYygn = i.IsVisible;
+          }
+        }
+      } else {
+      }
+      //咨询记录(快捷菜单权限验证)
+      let list3 = that.authorList["zxjl"];
+      if (list3) {
+        for (let i of list3) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddZxjl = i.IsVisible;
+          }
+        }
+      } else {
+      }
+      //到店登记(快捷菜单权限验证)
+      let list4 = that.authorList["dddj"];
+      if (list4) {
+        for (let i of list4) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddComeLog = i.IsVisible;
+          }
+        }
+      } else {
+      }
+
+      //追踪计划(快捷菜单权限验证)
+      let list5 = that.authorList["trackPlan"];
+      if (list5) {
+        for (let i of list5) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddTrackPlan = i.IsVisible;
+          }
+        }
+      }
+
+      //常规追踪(快捷菜单权限验证)
+      let list6 = that.authorList["trackRecord"];
+      if (list6) {
+        for (let i of list6) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddTrackRecord = i.IsVisible;
+          }
+        }
+      }
+
+      //常规追踪(快捷菜单权限验证)
+      let list7 = that.authorList["arrearsRecovery"];
+      if (list7) {
+        for (let i of list7) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddArrearsRecovery = i.IsVisible;
+          }
+        }
+      }
+
+      that.setShortcutMenuIndex = 0;
+    },
+    addPoups(name) {
+      let that = this;
+      let type = Number(name);
+      if (type == 0) {
+        that.$router.push({
+          name: "xmqz",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 1) {
+        that.$router.push({
+          name: "dddj",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 2) {
+        that.$router.push({
+          name: "zxjl",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 3) {
+        that.$router.push({
+          name: "yygn",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 4) {
+        that.$router.push({
+          name: "trackPlan",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 5) {
+        that.$router.push({
+          name: "trackRecord",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "浏览") {
+            that.showDetail = i.IsVisible;
+          }
+        }
+      }
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+      that.rowPhone = row.truePhone;
+    },
+    lookDetail() {
+      // 跳转详情页
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择客户");
+        return false;
+      }
+      that.$router.push({
+        path: "/customerDetail",
+        query: {
+          ID: that.rowID
+        }
+      });
+    },
+    searchList() {
+      let that = this;
+      if (that.formItem.StartDate || that.formItem.EndDate) {
+        // 两者同时存在
+        if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.tablePage.page = 1;
+      that.getList();
+    //   console.log(
+    //     moment(that.formItem.StartDate).format("YYYY-MM-DD"),
+    //     moment(that.formItem.EndDate).format("YYYY-MM-DD")
+    //   );
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+      that.tablePage = teblePage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      if (that.formItem.StartDate || that.formItem.EndDate) {
+        // 两者同时存在
+        if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        StartDate: that.formItem.StartDate,
+        EndDate: that.formItem.EndDate,
+        CustomerName: that.formItem.CustomerName,
+        CustomerPhone: that.formItem.CustomerPhone,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum,
+        RequestType: that.formItem.RequestType
+      };
+      // 转换日期
+      if (data.StartDate) {
+        data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+      }
+      if (data.EndDate) {
+        data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+      }
+      // 判断电话
+      if (data.CustomerPhone) {
+        let regex = /^1\d{10}$/;
+        if (!regex.test(data.CustomerPhone)) {
+          that.$Message.error("电话号码格式有误");
+          return false;
+        }
+      }
+      that.tableLoading = true;
+      api.getCustomersList(data).then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          for (let i of res.list) {
+            let phone = i.Phone;
+            i.truePhone = phone;
+            i.Phone =
+              phone.substring(0, 3) + "****" + phone.substr(phone.length - 4);
+          }
+          that.list = res.list;
+          that.tableLoading = false;
+          that.$set(that.tablePage, "page", res.page);
+          that.$set(that.tablePage, "allNum", res.total);
+          that.tablePage.maxPageNum = res.totalPage;
+          that.setPage();
+        } else {
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`,
+        columns: that.columns1.filter(
+          (col, index) => index < that.columns1.length - 2
+        ),
+        data: that.list.filter(
+          (data, index) => index < that.columns1.length - 2
+        )
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.setShortcutMenuAuthor();
+      that.setAuthor();
+    });
+  }
+};
+</script>
+<style>
+</style>

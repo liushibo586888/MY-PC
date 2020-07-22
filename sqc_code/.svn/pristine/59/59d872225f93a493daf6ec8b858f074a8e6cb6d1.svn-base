@@ -1,0 +1,289 @@
+<template>
+  <div class="jyshD-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="15">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="searchList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          护理师业绩客户占比
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      spinShow: true,
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        storeID: "",
+        store: "",
+        EmployeeID: ""
+      },
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    choose(name, id) {
+      this.formItem.storeID = id;
+    },
+    searchList() {
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    setEcharts(xinData, zhuiData, oldData, jiaData, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              // 坐标轴指示器，坐标轴触发有效
+              type: "shadow" // 默认为直线，可选为：'line' | 'shadow'
+            }
+          },
+          legend: {
+            data: ["新客", "跟踪客", "老客", "家居产品"]
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            containLabel: true
+          },
+          yAxis: {
+            type: "value"
+          },
+          xAxis: {
+            type: "category",
+            data: barName
+          },
+          series: [
+            {
+              name: "新客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: xinData
+            },
+            {
+              name: "跟踪客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: zhuiData
+            },
+            {
+              name: "老客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: oldData
+            },
+            {
+              name: "家居产品",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: jiaData
+            }
+          ]
+        };
+
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StartDate: that.formItem.startDate,
+          EndDate: that.formItem.endDate,
+          StoreID: that.formItem.storeID,
+          customerStatus: "",
+          EmployeeID: that.userMes.EmployeeID
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        }
+        that.tableLoading = true;
+        that.spinShow = true;
+        api
+          .getAllEmployeeCustomerTypePerformanceFromStore(data)
+          .then(response => {
+            that.tableLoading = false;
+            if (response.error_code === "Success") {
+              that.list = response.data;
+              that.setPieData();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+      }, 100);
+    },
+    setPieData() {
+      let that = this;
+      let xinData = [];
+      let zhuiData = [];
+      let oldData = [];
+      let jiaData = [];
+      let barName = [];
+      for (let i in that.list) {
+        xinData.push(that.list[i].NewCustomerFirstVisit);
+        zhuiData.push(that.list[i].NewCustomerFurtherConsulting);
+        oldData.push(that.list[i].OldCustomer);
+        jiaData.push(that.list[i].Value4);
+        barName.push(that.list[i].Name);
+      }
+      that.setEcharts(xinData, zhuiData, oldData, jiaData, barName);
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getValidStoresNew(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.store = that.userMes.StoreName;
+          that.formItem.storeID = that.userMes.StoreID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getStore();
+    that.getList();
+  }
+};
+</script>
+<style>
+</style>

@@ -1,0 +1,303 @@
+<template>
+  <div class="zfmx-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <FormItem prop="userTel">
+              <Input v-model="formItem.userTel" placeholder="电话" />
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="name">
+              <Input v-model="formItem.name" placeholder="姓名" />
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="status">
+              <Select v-model="formItem.status" placeholder="状态" :filterable="true">
+                <Option v-for="item in statusList" :value="item.ID" :key="item.ID">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="15">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+
+    <Modal v-model="modal1" title="微信支付订单信息">
+      <p class="titleP">微信支付订单号:　{{transaction_id}}</p>
+      <p class="titleP">微信支付结束时间:　{{time_end}}</p>
+      <p class="titleP">微信支付状态:　{{trade_state}}</p>
+      <p class="titleP" style="margin-bottom:0">微信支付金额:　{{cash_fee}}</p>
+    </Modal>
+
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+
+      <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+        <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+      </Select>
+
+      <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+      <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+      <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+      <div class="page-box">
+        <p>前往</p>
+        <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+        <p>页</p>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    return {
+      transaction_id: "",
+      cash_fee: "",
+      time_end: "",
+      trade_state: "",
+
+      modal1: false,
+      ZFtitle: "",
+      rowID: "",
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 40,
+      formItem: {
+        status: 1,
+        EmployeeID: "",
+        userTel: "",
+        name: ""
+      },
+      columns1: [
+        {
+          title: "客户姓名",
+          key: "CustName",
+          align: "center"
+        },
+        {
+          title: "电话",
+          key: "CustomerTel",
+          align: "center"
+        },
+        {
+          title: "项目名",
+          key: "ItemName",
+          align: "center"
+        },
+        {
+          title: "支付金额",
+          key: "total_fee",
+          align: "center"
+        },
+        {
+          title: "支付状态",
+          key: "OrderState",
+          align: "center",
+          render: (h, params) => {
+            return h(
+              "div",
+              {},
+              params.row.OrderState == 1 ? "已付款" : "未付款"
+            );
+          }
+        },
+        {
+          title: "订单信息",
+          key: "OrderState",
+          align: "center",
+          render: (h, params) => {
+            return h(
+              "button",
+              {
+                on: {
+                  click: () => {
+                    this.chakan(params.row);
+                  }
+                },
+                style: {
+                  backgroundColor: "#19be6b",
+                  color: "#ffffff",
+                  padding: "5px 20px 5px 20px"
+                }
+              },
+              params.row.OrderState == 1 ? "查看" : "查看"
+            );
+          }
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      statusList: [{ ID: 1, Name: "已付款" }, { ID: 2, Name: "未付款" }]
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    chakan(row) {
+      let that = this;
+      that.rowID = row.out_trade_no;
+      that.modal1 = true;
+      let data = {
+        out_trade_no: that.rowID
+      };
+      api.GetAccountAmount(data).then(res => {
+        if (res.error_code === "Success") {
+          let list = res.data;
+          that.transaction_id = list.transaction_id;
+          that.cash_fee = list.cash_fee;
+          that.time_end = list.time_end;
+          that.trade_state = list.trade_state;
+        }
+      });
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      that.getList();
+      //判断两个时间段大小
+      // echartsCommon.message = that.$Message;
+      // if (
+      //   echartsCommon.ContrastTime(
+      //     that.formItem.StartDate,
+      //     that.formItem.EndDate
+      //   )
+      // ) {
+      //   that.tablePage.page = 1;
+      //   that.getList();
+      // }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.formItem.status = "";
+      that.getList();
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          storeId: that.userMes.StoreID,
+          orderState: that.formItem.status,
+          customerTel: that.formItem.userTel,
+          custName: that.formItem.name,
+          Page: that.tablePage.page,
+          Size: that.tablePage.pageNum
+        };
+        that.tableLoading = true;
+        api.QueryOrderList(data).then(response => {
+          if (response.error_code === "Success") {
+            let res = response.data;
+            that.list = res.list;
+            that.tableLoading = false;
+            that.page = res.page;
+            that.tablePage.allNum = res.total;
+            that.tablePage.maxPageNum = res.totalPage;
+            that.setPage();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+    });
+  }
+};
+</script>
+<style scoped>
+.titleP {
+  margin-bottom: 10px;
+}
+</style>
+

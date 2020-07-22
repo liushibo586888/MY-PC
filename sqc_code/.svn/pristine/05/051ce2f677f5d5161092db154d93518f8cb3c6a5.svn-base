@@ -1,0 +1,430 @@
+<template>
+    <div class="jyshD-container container">
+        <div>
+            <Tabs value="name1" @on-click="tabChangejyshD">
+                <TabPane label="顾客分类业绩占比" icon="dot" name="name1">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name1'">
+                            <yjje-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="项目分类业绩占比" icon="dot" name="name2">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name2'">
+                            <yjje1-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje1-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="新客项目分类业绩占比" icon="dot" name="name3">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name3'">
+                            <yjje2-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje2-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="跟踪客项目分类业绩占比" icon="dot" name="name4">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name4'">
+                            <yjje3-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje3-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="护理客项目分类业绩占比" icon="dot" name="name5">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name5'">
+                            <yjje4-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje4-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="总业绩护理师占比" icon="dot" name="name6">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name6'">
+                            <yjje5-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje5-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="到店人数分类占比" icon="dot" name="name7">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name7'">
+                            <yjje6-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje6-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="护理师业绩客户占比" icon="dot" name="name8">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name8'">
+                            <yjje7-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje7-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="新客到店项目分类占比" icon="dot" name="name9">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name9'">
+                            <yjje8-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje8-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="新客到店渠道分类占比" icon="dot" name="name10">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name10'">
+                            <yjje9-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje9-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <!-- <TabPane label="渠道分类占比" icon="dot" name="name11">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name11'">
+                            <yjje10-demo></yjje10-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane> -->
+
+                <TabPane label="新客成交项目分类占比" icon="dot" name="name12">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name12'">
+                            <yjje11-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje11-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="项目客单价" icon="dot" name="name13">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name13'">
+                            <yjje12-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje12-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="顾客分类占比" icon="dot" name="name14">
+                    <keep-alive>
+                        <template v-if="tabIndex1=='name14'">
+                            <yjje13-demo :startDate="startDate" :endDate="endDate" :storeID="storeID"></yjje13-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+            </Tabs>
+        </div>
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="store">
+                            <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="timeList">
+                            <Select v-model="formItem.month" placeholder="时间" :filterable="true" :label-in-value="true" @on-change="changeTimeD">
+                                <Option v-for="item in timeList" :value="item.value" :key="item.value">{{ item.label }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="searchList">查询</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+    </div>
+</template>
+<script>
+import { mapState } from "vuex";
+import moment from "moment";
+import api from "@/api/index.js";
+import echartsCommon from "@/api/Common.js";
+import yjjeDemo from "../reportCenter/jyshDchilddren/yjjeGKFL";
+import yjje1Demo from "../reportCenter/jyshDchilddren/yjjeXMFL";
+import yjje2Demo from "../reportCenter/jyshDchilddren/yjjeXXMFL";
+import yjje3Demo from "../reportCenter/jyshDchilddren/yjjeGZK";
+import yjje4Demo from "../reportCenter/jyshDchilddren/yjjeHLKXMFL";
+import yjje5Demo from "../reportCenter/jyshDchilddren/yjjeZYJZB";
+import yjje6Demo from "../reportCenter/jyshDchilddren/yjjeDDRSZB";
+import yjje7Demo from "../reportCenter/jyshDchilddren/yjjeHLSYJ";
+
+import yjje8Demo from "../reportCenter/jyshDchilddren/yjjeXKDDxm";
+import yjje9Demo from "../reportCenter/jyshDchilddren/yjjeXKDDqd";
+import yjje10Demo from "../reportCenter/jyshDchilddren/yjjeQDfl";
+import yjje11Demo from "../reportCenter/jyshDchilddren/yjjeCJL";
+import yjje12Demo from "../reportCenter/jyshDchilddren/yjjeKDJ";
+import yjje13Demo from "../reportCenter/jyshDchilddren/yjjeGKFLZB";
+
+export default {
+  data() {
+    return {
+      tabIndex1: "name1",
+      options1: echartsCommon.shortcuts(),
+      spinShow: true,
+      startDate: new Date(),
+      endDate: new Date(),
+      storeID: "",
+      formItem: {
+        month: "",
+        startDate: new Date(),
+        endDate: new Date(),
+        storeID: "",
+        store: "",
+        EmployeeID: ""
+      },
+      list: [],
+      storeList: [],
+      timeList: [
+        {
+          value: 1,
+          label: "上旬"
+        },
+        {
+          value: 2,
+          label: "中旬"
+        },
+        {
+          value: 3,
+          label: "下旬"
+        },
+        {
+          value: 4,
+          label: "上月"
+        },
+        {
+          value: 5,
+          label: "本月"
+        }
+      ]
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    })
+  },
+  methods: {
+    changeTimeD(val) {
+      let that = this;
+      let date = new Date();
+      let year = date.getYear();
+      let month = date.getMonth() + 1;
+      let day = new Date(year, month, 0).getDate(); //获取当月的最后一天
+
+      let year2 = date.getFullYear();
+      let month2 = date.getMonth();
+      if (month2 == 0) {
+        month2 = 12;
+        year2 = year2 - 1;
+      }
+      if (month2 < 10) {
+        month2 = "0" + month2;
+      }
+      let day2 = new Date(year2, month2, 0).getDate(); //获取上月的最后一天
+
+      let year1 = moment(date)
+        .format("YYYY-MM-DD")
+        .slice(0, 4);
+      let month1 = moment(date)
+        .format("YYYY-MM-DD")
+        .slice(5, 7);
+      if (val.label == "上旬") {
+        that.formItem.startDate = year1 + month1 + "01";
+        that.formItem.endDate = year1 + month1 + "10";
+      }
+      if (val.label == "中旬") {
+        that.formItem.startDate = year1 + month1 + "11";
+        that.formItem.endDate = year1 + month1 + "20";
+      }
+      if (val.label == "下旬") {
+        that.formItem.startDate = year1 + month1 + "21";
+        that.formItem.endDate = year1 + month1 + day;
+      }
+      if (val.label == "上月") {
+        month1 = Number(month1) - 1;
+
+        if (month1 < 1) {
+          month1 = 12;
+          year1 = Number(year1) - 1;
+        }
+        that.formItem.startDate = year1 + "-" + month1 + "-" + "01";
+        that.formItem.endDate = year1 + "-" + month1 + "-" + day2;
+      }
+      if (val.label == "本月") {
+        that.formItem.startDate = year1 + month1 + "01";
+        that.formItem.endDate = year1 + month1 + day;
+      }
+    },
+    tabChangejyshD(name1) {
+      let that = this;
+      that.tabIndex1 = name1;
+    },
+    choose(name, id) {
+      this.formItem.storeID = id;
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getValidStoresNew(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.store = that.userMes.StoreName;
+          that.formItem.storeID = that.userMes.StoreID;
+          that.storeID = that.userMes.StoreID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    searchList() {
+      let that = this;
+      //判断两个时间段大小
+      echartsCommon.message = that.$Message;
+      if (
+        echartsCommon.ContrastTime(
+          that.formItem.startDate,
+          that.formItem.endDate
+        )
+      ) {
+        that.startDate = that.formItem.startDate;
+        that.endDate = that.formItem.endDate;
+        that.storeID = that.formItem.storeID;
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.formItem.month = "";
+      //   that.getList();
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getStore();
+  },
+  components: {
+    yjjeDemo,
+    yjje1Demo,
+    yjje2Demo,
+    yjje3Demo,
+    yjje4Demo,
+    yjje5Demo,
+    yjje6Demo,
+    yjje7Demo,
+    yjje8Demo,
+    yjje9Demo,
+    yjje10Demo,
+    yjje11Demo,
+    yjje12Demo,
+    yjje13Demo
+  }
+};
+</script>
+<style>
+.jyshD-container {
+  width: 100%;
+  position: relative;
+  padding: 72px 0px;
+  background: #f0f0f0;
+  overflow: visible !important;
+}
+.jyshD-container .ivu-tabs-nav .ivu-tabs-tab .ivu-icon.ivu-icon-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e9eaec;
+}
+.jyshD-container .ivu-tabs-nav {
+  margin-bottom: 0px;
+}
+.jyshD-container .ivu-tabs-tab-active .ivu-icon.ivu-icon-dot {
+  background: #79aa49 !important;
+}
+.jyshD-container .ivu-tabs {
+  margin-top: -72px;
+}
+.jyshD-container .ivu-tabs .ivu-tabs-tabpane {
+  margin-top: -20px;
+}
+.jyshD-container .ivu-form-item-content {
+  position: relative;
+  line-height: 40px;
+  font-size: 12px;
+}
+.jyshD-container .search-box {
+  border-radius: 5px;
+  background: #fff;
+  padding: 10px 20px;
+  top: 35px;
+}
+.jyshD-container .header {
+  position: absolute;
+  padding-left: 22px;
+  font-size: 14px;
+  height: 40px;
+  line-height: 40px;
+  top: 0;
+  width: 100%;
+  left: 0;
+}
+.jyshD-container .form-box {
+  background: #f0f0f0;
+  height: 480px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+.jyshD-container .form-box > .charts {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  width: 20%;
+  padding-top: 40px;
+  height: 100%;
+  flex: 1;
+}
+.jyshD-container .form-box .content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.jyshD-container #data_source_com,
+.jyshD-container #data_source_fb {
+  height: 100%;
+  width: 100%;
+}
+.amount {
+  position: absolute;
+  font-size: 25px;
+  right: 250px;
+}
+</style>

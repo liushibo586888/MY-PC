@@ -1,0 +1,249 @@
+<template>
+    <div class="cwsr-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="StartDate">
+                            <DatePicker type="date" placeholder="开始日期" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="EndDate">
+                            <DatePicker type="date" placeholder="结束日期" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="store">
+                            <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                                <Option value="all" @click.native="choose()">所有</Option>
+                                <Option v-for="item in storeList" :value="item.ID" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="15">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="searchForm">搜索</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <!-- <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost">上一页</i-button>
+            <i-button class="btn btn-next" type="primary">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" :value="1"></Input-number>
+                <p>页</p>
+            </div> -->
+        </div>
+    </div>
+</template>
+<script>
+    import api from '@/api/index.js'
+    import { mapState } from 'vuex'
+    import moment from "moment"
+    export default{
+        data () {
+            return {
+                tableLoading: false,
+                tablePage: {
+                    page: 1,
+                    pageNum: 10,
+                    maxPageNum: 100,
+                    allNum: 199,
+                    startNum: 0,
+                    endNum: 0
+                },
+                formItem: {
+                    StartDate: new Date(),
+                    EndDate: new Date(),
+                    EmployeeID: '',
+                    store: 'all',
+                    StoreID: null
+                },
+                tableHeight: 400,
+                columns1: [
+                    {
+                        title: '项目分类',
+                        key: 'ItemCategoryName',
+                        align: 'center'
+                    }, {
+                        title: '货币金额',
+                        key: 'CashAmount',
+                        align: 'center',
+                        render: (h, parmas) => {
+                            let money = Number(parmas.row.CashAmount)
+                            return h('div', {
+                            }, money.toFixed(2))
+                        }
+                    }, {
+                        title: '预交金额',
+                        key: 'PrepaymentAmount',
+                        align: 'center',
+                        render: (h, parmas) => {
+                            let money = Number(parmas.row.PrepaymentAmount)
+                            return h('div', {
+                            }, money.toFixed(2))
+                        }
+                    }, {
+                        title: '欠费',
+                        key: 'ArrearsAmount',
+                        align: 'center',
+                        render: (h, parmas) => {
+                            let money = Number(parmas.row.ArrearsAmount)
+                            return h('div', {
+                            }, money.toFixed(2))
+                        }
+                    }, {
+                        title: '总价',
+                        key: 'AllTotal',
+                        align: 'center',
+                        render: (h, parmas) => {
+                            let money = Number(parmas.row.AllTotal)
+                            return h('div', {
+                            }, money.toFixed(2))
+                        }
+                    }, {
+                        title: '代金券',
+                        key: 'InsteadMoneyAmount',
+                        align: 'center'
+                    }
+                ],
+                list: [],
+                storeList: []
+            }
+        },
+        computed: {
+            ...mapState({
+                userMes: state => state.app.userMes,
+                tableRows: state => state.app.tableRows
+            }),
+            setTableHeight () {
+                let that = this
+                return that.tableHeight
+            }
+        },
+        methods: {
+            resetSearch () {
+                // 重置搜索
+                let that = this
+                that.$refs.searchForm.resetFields()
+                that.getList()
+            },
+            searchForm () {
+                // 搜索表格
+                let that = this
+                if (that.formItem.StartDate && that.formItem.EndDate) {
+                    // 两者同时存在
+                    if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+                        that.$Message.error('开始日期不得大于结束日期')
+                        return false
+                    } else {
+                        that.getList()
+                    }
+                }
+            },
+            initTableHeight () {
+                let that = this
+                that.tableHeight = document.getElementById('tableBox').offsetHeight
+                window.onresize = function() {
+                    that.tableHeight = document.getElementById('tableBox').offsetHeight
+                }
+            },
+            setPage () {
+                let that = this
+                let teblePage = that.tablePage
+                teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1
+                let endPage = teblePage.page * teblePage.pageNum
+                teblePage.endNum = endPage > teblePage.allNum ? teblePage.allNum : endPage
+            },
+            getList () {
+                let that = this
+                let userMessage = JSON.parse(localStorage.userMessage)
+                that.formItem.EmployeeID = userMessage.EmployeeID
+                let data = that.formItem
+                if (data.StartDate) {
+                    data.StartDate = moment(data.StartDate).format('YYYY-MM-DD')
+                    that.formItem.StartDate = data.StartDate
+                }
+                if (data.EndDate) {
+                    data.EndDate = moment(data.EndDate).format('YYYY-MM-DD')
+                    that.formItem.EndDate = data.EndDate
+                }
+                that.tableLoading = true
+                api.getFinancialIncomeStatement(that.formItem).then((response) => {
+                    that.tableLoading = false
+                    if (response.error_code === 'Success') {
+                        that.list = response.data.list
+                        let a = {
+                            ItemCategoryName: '合计',
+                            CashAmount: 0,
+                            PrepaymentAmount: 0,
+                            ArrearsAmount: 0,
+                            AllTotal: 0,
+                            InsteadMoneyAmount: 0
+                        }
+                        for (let i of that.list) {
+                            a.CashAmount += Number(i.CashAmount)
+                            a.PrepaymentAmount += Number(i.PrepaymentAmount)
+                            a.ArrearsAmount += Number(i.ArrearsAmount)
+                            a.AllTotal += Number(i.AllTotal)
+                            a.InsteadMoneyAmount += Number(i.InsteadMoneyAmount)
+                        }
+                        if (that.list.length > 0) {
+                            that.list.push(a)
+                        }
+                    } else {
+                        that.$Message.error(response.error_message)
+                    }
+                })
+            },
+            exportTable () {
+                let that = this
+                that.$refs.mainTable.exportCsv({
+                    filename: `${new Date().getTime()}${document.title}`
+                })
+            },
+            // 获取有效门店
+            getStore () {
+                let that = this
+                api.getValidStores().then((response) => {
+                    if (response.error_code === 'Success') {
+                        that.storeList = response.data.list
+                    } else {
+                        that.$Message.error(response.error_message)
+                    }
+                });
+            },
+            choose (name, id) {
+                if (name === undefined && id === undefined) {
+                    this.formItem.store = '所有'
+                    this.formItem.StoreID = null
+                } else {
+                    this.formItem.store = name
+                    this.formItem.StoreID = id
+                }
+            }
+        },
+        mounted () {
+            let that = this
+            that.$nextTick(() => {
+                that.initTableHeight()
+                that.getList()
+                that.getStore()
+            })
+        }
+    }
+</script>
+<style>
+</style>
+

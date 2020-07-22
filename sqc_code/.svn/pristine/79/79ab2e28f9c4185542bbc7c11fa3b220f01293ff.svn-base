@@ -1,0 +1,1533 @@
+<template>
+  <div class="yygn-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="userName">
+              <Input v-model="formItem.userName" placeholder="姓名"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="userTel">
+              <Input v-model="formItem.userTel" placeholder="电话"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="12">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="searchForm" :loading="upLoading">搜索</Button>
+              <Button type="warning" class="btn" @click="resetSearch" :loading="upLoading">重置</Button>
+              <Button type="primary" class="btn btn-add" @click="showAddPoup" v-if="showAdd">添加</Button>
+              <Button type="primary" class="btn btn-purple" @click="cancelProject" v-if="showCancel" :disabled="!rowID">取消</Button>
+
+              <Dropdown transfer @on-click="addPoups" v-if="shortcutMenuIndex > 0">
+                <Button type="primary" class="btn btn-add" :disabled="!rowPhone">
+                  快捷菜单
+                </Button>
+                <DropdownMenu slot="list">
+                  <DropdownItem name="0" :disabled="!rowPhone" v-if="canAddXmqz">开单</DropdownItem>
+                  <DropdownItem name="1" :disabled="!rowPhone" v-if="canAddComeLog">到店登记</DropdownItem>
+                  <DropdownItem name="2" :disabled="!rowPhone" v-if="canAddZxjl">添加咨询记录</DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" :height="setTableHeight" ref="mainTable" highlight-row stripe @on-current-change="getRowID"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+      <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+        <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+      </Select>
+      <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+      <i-button class="btn btn-prev" type="ghost" @click="prevPage()" :loading="upLoading">上一页</i-button>
+      <i-button class="btn btn-next" type="primary" @click="nextPage()" :loading="upLoading">下一页</i-button>
+      <div class="page-box">
+        <p>前往</p>
+        <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+        <p>页</p>
+      </div>
+    </div>
+    <!-- 选择预约类型弹窗 -->
+    <Modal :mask-closable="false" v-model="reservationType" class="dialog" class-name="vertical-center-modal" v-if="showAdd">
+      <div slot='header' class="header">
+        选择预约类型
+      </div>
+      <Form :model="formValidate" :label-width="120" inline width="600" ref="formValidate1" @submit.native.prevent="chooseType">
+        <Row>
+          <i-col span="24">
+            <FormItem prop="CustomerPhone" label="查询电话：" style="width:100%;" :rules="formValidateRule.CustomerPhone">
+              <!-- <Input v-model="formValidate.CustomerPhone" placeholder="请输入"  @on-blur="searchCustomerPhone(this)" autofocus ref="searchTel"></Input> -->
+              <Input v-model="formValidate.CustomerPhone" placeholder="请输入" @on-blur="searchCustomerPhone()" autofocus ref="searchTel"></Input>
+            </FormItem>
+          </i-col>
+        </Row>
+        <Row>
+          <i-col span="24">
+            <FormItem prop="type" label="选择预约：" style="width:100%;" :rules="formValidateRule.type">
+              <Select v-model="formValidate.type">
+                <Option :value="item.ID" v-for="(item, index) in reserveTypeList" :key="index">{{item.Name}}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </Row>
+
+        <Row>
+          <i-col span="24">
+
+            <FormItem label="预约门店：" prop="ReserveStoreName" style="width:100%" v-if="haveStore">
+              <Input v-model="formValidate.ReserveStoreName" placeholder="" disabled />
+            </FormItem>
+
+            <FormItem label="预约门店：" prop="ReserveStoreID" style="width:100%" :rules="formValidateRule.ReserveStoreID" v-else>
+              <Select v-model="formValidate.ReserveStoreID" placeholder="请选择">
+                <Option :value="item.ID" v-for="(item, index) in storeList" :key="index">{{item.Name}}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </Row>
+
+      </Form>
+      <div slot="footer" class="footer" style="padding-right:0;">
+        <Button type="primary" class="btn" @click="chooseType" :loading="upLoading" :disabled="confirmReserveType">确定</Button>
+      </div>
+    </Modal>
+    <!-- 到店预约 -->
+    <Modal :mask-closable="false" v-model="shopReservationType" class="dialog" class-name="vertical-center-modal" v-if="showAdd">
+      <div slot='header' class="header">
+        到店预约
+      </div>
+      <Form :model="shopReservation" :label-width="120" inline @submit.native.prevent="addShopReservation" width="600" ref="shopReservationType">
+        <Row>
+          <i-col span="24">
+            <FormItem prop="Date" label="预约日期：" style="width:100%;">
+              <DatePicker type="datetime" :clearable="false" v-model="shopReservation.Date" style="width:100%;"></DatePicker>
+            </FormItem>
+          </i-col>
+        </Row>
+        <Row>
+          <i-col span="24">
+            <FormItem prop="Remark" label="预约备注：" style="width:100%;">
+              <Input v-model="shopReservation.Remark" placeholder="请输入" type="textarea" :rows="4"></Input>
+            </FormItem>
+          </i-col>
+        </Row>
+      </Form>
+      <div slot="footer" class="footer" style="padding-right:0;">
+        <Button type="primary" class="btn" @click="addShopReservation" :loading="upLoading">确定</Button>
+      </div>
+    </Modal>
+    <!-- 治疗预约 -->
+    <Modal :mask-closable="false" v-model="treatmentReservationType" class="dialog treatmentReservation-dialog" class-name="vertical-center-modal" v-if="showAdd">
+      <div slot='header' class="header">
+        治疗预约
+      </div>
+      <Form :model="treatmentReservation" :label-width="120" inline @submit.native.prevent width="600" ref="shopReservationType">
+        <Row>
+          <i-col span="24">
+            <FormItem prop="Date" label="预约日期：" style="width:100%;">
+              <DatePicker @on-change="changeDate" type="date" :clearable="false" v-model="treatmentReservation.Date" style="width:100%;"></DatePicker>
+            </FormItem>
+          </i-col>
+        </Row>
+        <Row>
+          <i-col span="24">
+            <div class="item" @click="projectListModal = true, getCustomerPurchasedItems(), projectTabIndex=1">
+              <div class="label">选择项目：</div>
+              <div class="content">{{treatmentReservation.projectName}}
+                <Icon type="aaa-msnui-more" class="icon" />
+              </div>
+            </div>
+          </i-col>
+        </Row>
+        <Row>
+          <i-col span="24">
+            <!-- <div class="item" @click="getBeauticianList">
+                            <div class="label">护理师：</div>
+                            <div class="content">{{treatmentReservation.beautician}}
+                                <template v-if="timeSlot.length>0">(
+                                    <span v-for="(i, index) in timeSlot" :key="index">{{i}} </span>)</template>
+                                <Icon type="aaa-msnui-more" class="icon" />
+                            </div>
+                        </div> -->
+            <FormItem label="护理师：" prop="beautician" style="width:100%">
+              <Select v-model="treatmentReservation.beautician" placeholder="请选择" @on-change="chooseBeautician">
+                <Option :value="item.ID" v-for="(item, index) in beauticianList" :key="index">{{item.Name}}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </Row>
+        <Row>
+          <i-col span="24">
+            <FormItem prop="Remark" label="预约备注：" style="width:100%;">
+              <Input v-model="treatmentReservation.Remark" placeholder="请输入" type="textarea" :rows="4"></Input>
+            </FormItem>
+          </i-col>
+        </Row>
+      </Form>
+      <div slot="footer" class="footer" style="padding-right:0;">
+        <Button type="primary" class="btn" @click="sureTreatment" :loading="upLoading">确定</Button>
+      </div>
+    </Modal>
+    <!-- 选择项目 -->
+    <Modal :mask-closable="false" v-model="projectListModal" class="dialog choose-project" class-name="vertical-center-modal" width="500" v-if="showAdd">
+      <div slot='header' class="header">
+        选择项目
+      </div>
+      <div class="tab-box">
+        <div class="tab" :class="{'active' : projectTabIndex == 1}" @click="tabChange(1)">已购项目</div>
+        <div class="tab" :class="{'active' : projectTabIndex == 2}" @click="tabChange(2)">未购项目</div>
+      </div>
+      <div class="search-list">
+        <Input v-model="projectSearch" placeholder="请输入项目名称" style="width: 300px; margin: 10px 0 10px 4%;" icon="search"></Input>
+      </div>
+      <div class="list-content">
+        <Spin size="large" fix v-if="projectShow"></Spin>
+        <!-- 单条 已购-->
+        <div class="item" v-for="(item, index) in customerPurchasedList" :key="index" v-if="projectTabIndex == 1 && customerPurchasedList.length > 0 && (item.ItemName.indexOf(projectSearch) > -1 || item.SimpleCode.indexOf(projectSearch) > -1)" @click="chooseItem(item)">
+          <div class="title">
+            <div class="left-title">{{item.ItemName}}</div>
+            <!-- <div class="right-title">编号：{{item.CertainProjectID}}</div> -->
+          </div>
+          <div class="content">
+            <Row>
+              <i-col span="24">
+                <p>项目规格： {{item.ItemStandard}}</p>
+                <p>项目单位： {{item.ItemUnit}}</p>
+                <p>剩余次数： {{item.RemainingTimes}}</p>
+                <p>执行状态： {{item.ExecuteStatusName}}</p>
+                <p>购买日期： {{item.Date | formatDate}}</p>
+                <p>简码： {{item.SimpleCode}}</p>
+              </i-col>
+              <!-- <i-col span="14">
+                                <div style="overflow:hidden; width:100%;">
+                                    <p style="width:20%; float:left;text-align:right;">备注：</p>
+                                    <p style="width:80%; height:100%; float:left; white-space:normal;word-wrap:break-word;word-break:break-all;">{{item.Remark}}</p>
+                                </div>
+                            </i-col> -->
+            </Row>
+          </div>
+        </div>
+        <!-- 单条 未购-->
+        <div class="item" v-for="(item, index) in reserveItemInfoList" :key="index" v-if="projectTabIndex == 2 && reserveItemInfoList.length>0 && (item.Name.indexOf(projectSearch) > -1 || item.SimpleCode.indexOf(projectSearch) > -1)" @click="chooseItem(item)">
+          <div class="title">
+            <div class="left-title">{{item.Name}}</div>
+            <!-- <div class="right-title">编号：{{item.ID}}</div> -->
+          </div>
+          <div class="content">
+            <Row>
+              <i-col span="24">
+                <p>项目规格： {{item.Standard}}</p>
+                <p>项目单位： {{item.Unit}}</p>
+                <p>项目单价： {{item.Price}}</p>
+                <p>简码： {{item.SimpleCode}}</p>
+              </i-col>
+            </Row>
+          </div>
+        </div>
+        <!-- 未购买提示 -->
+        <div v-if="customerPurchasedList.length > 0 || reserveItemInfoList.length > 0" style="height:50px; line-height:50px;text-align:center;color:#666;">
+          暂无项目
+        </div>
+        <!-- ** -->
+      </div>
+      <div slot="footer" style="padding-right:0;"></div>
+    </Modal>
+    <!-- 护理师-->
+    <!-- <Modal :mask-closable="false" v-model="beauticianModal" class="dialog choose-beautician" class-name="vertical-center-modal" width="650" style="padding-top:45px;" v-if="showAdd"> -->
+    <!-- <div slot='header' class="header">
+                选择护理师
+            </div> -->
+    <!-- <select name="" id="">
+                        <option value="1">1111</option>
+                    </select> -->
+
+    <!-- 选择日期 -->
+    <!-- <div class="date-box" style="width:100%;padding-bottom: 16px;">
+                <Row type="flex" justify="center">
+                    <i-col span="3">
+                        <div class="prev-day" style="display:flex;align-items: center;" @click="prevDay">
+                            <Icon type="chevron-left" style="margin-right:6px;"></Icon>
+                            <p>前一天</p>
+                        </div>
+                    </i-col>
+                    <i-col span="5" style="display:flex;align-items:center;justify-content:center;">
+                        <DatePicker :open="beauticianTime" :value="beauticianMes.date" type="date" confirm :clearable="false" @on-change="handleChange" @on-clear="handleClear" @on-ok="handleOk" v-if="showDateTime">
+                            <div class="date-wrapper" style="width:80px;text-align:center; background:#eee; height:27px;line-height:27px; border-radius:4px;cursor: pointer;" @click="handleClick">{{beauticianMes.date | formatDate}}</div>
+                        </DatePicker>
+                    </i-col>
+                    <i-col span="3">
+                        <div class="next-day" style="display:flex;align-items: center;" @click="nextDay">
+                            <p style="margin-right:6px;">后一天</p>
+                            <Icon type="chevron-right"></Icon>
+                        </div>
+                    </i-col>
+                </Row>
+            </div>
+            <div class="wrapper" style="height:334px; width:96%; margin: 0 auto; border-radius:4px; border:1px solid #ebebeb;">
+                <Row style="width:100%; height:100%;">
+                    <i-col span="8" style="height:100%;"> -->
+    <!-- 选择护理师列表 -->
+    <!-- <div class="beautician-list" style="width:100%; height:100%; border-right: 1px solid #ebebeb; overflow-y:auto;">
+                            <div class="beautician-item" v-for="(i, index) in beauticianList" :key="index" @click="chooseBeautician(index)" :class="{'active' : beauticianIndex == index}">
+                                <div class="beautician-avatar" v-if="i.Image" style="width:40px;height:40px; border-radius:50%; margin-right:10px;" :style="'background-image:url('+ i.Image +')'"></div>
+                                <div class="beautician-name">{{i.Name}}</div>
+                            </div>
+                        </div>
+                    </i-col>
+                    <i-col span="16" style="height:100%;"> -->
+    <!-- 选择时间段列表 -->
+    <!-- <div class="beautician-timer">
+                            <div class="title-box">选择预约时间段</div>
+                            <div class="content">
+                                <div class="item" v-for="(i,index) in appointmentList" :key="index" :class="{'active': timeQuantumArr.indexOf(i.ID) > -1, 'disable': i.IsCanReserve == false}" @click="chooseTimeSlot(i.ID, i.IsCanReserve)">
+                                    <Icon type="ios-circle-outline" v-if="timeQuantumArr.indexOf(i.ID) < 0" style="margin-right:10px;"></Icon>
+                                    <Icon type="ios-checkmark" style="color:#5acc5a;" v-else-if="i.IsCanReserve == true"></Icon>
+                                    <p class="text">{{i.Caption}}</p>
+                                </div> -->
+    <!-- 禁用 -->
+    <!--<div class="item">-->
+    <!--<Icon type="ios-circle-outline"></Icon>-->
+    <!--<p class="text"></p>-->
+    <!--</div>-->
+    <!-- </div>
+                        </div> -->
+    <!-- </i-col>
+                </Row>
+            </div> -->
+    <!-- <div slot="footer" class="footer" style="padding-right:10px;padding-bottom:10px;">
+                <Button type="primary" class="btn" @click="sureChoose" :loading="upLoading">确定</Button>
+            </div>
+        </Modal> -->
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import manager from "@/api/manager.js";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    const validateTel = (rule, value, callback) => {
+      let reg = /^1\d{10}$/;
+      if (value === "") {
+        callback(new Error("手机号不得为空"));
+      } else if (!reg.test(value)) {
+        callback(new Error("请输入正确的手机号"));
+      } else {
+        callback();
+      }
+    };
+    return {
+      //时间回到今天
+      options1: echartsCommon.shortcuts(),
+      // -----
+      // 到店预约时间段列表
+      toShopAppointmentList: [],
+      confirmReserveType: true,
+      haveStore: false,
+      shortcutMenuIndex: 0,
+      canAddXmqz: false,
+      canAddZxjl: false,
+      canAddComeLog: false,
+      rowPhone: null,
+      showAdd: false,
+      showCancel: false,
+      storeID: "",
+      rowID: null,
+      timeSlot: [],
+      projectSearch: "",
+      // 预约时间段列表
+      appointmentList: [],
+      customerID: "",
+      // 到店预约数据
+      shopReservation: {
+        CustomerPhone: "",
+        Remark: "",
+        Date: new Date()
+      },
+      shopReservationType: false,
+      // 治疗预约
+      treatmentReservation: {
+        Date: new Date(),
+        projectName: "",
+        CustomerPhone: "",
+        beautician: "",
+        Remark: ""
+      },
+      treatmentReservationType: false,
+      // 预约类型
+      reservationType: false,
+      // 项目
+      // 已经选中的项目
+      chooseProject: {},
+      projectListModal: false,
+      projectTabIndex: 1,
+      projectShow: false,
+      upLoading: false,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableLoading: false,
+      tableHeight: 400,
+      formValidate: {
+        type: null,
+        // CustomerPhone: null,
+        CustomerPhone: "",
+        ReserveStoreID: "",
+        ReserveStoreName: ""
+      },
+      formValidateRule: {
+        CustomerPhone: {
+          required: true,
+          message: "请输入正确的电话格式",
+          trigger: "blur, change",
+          validator: validateTel
+        },
+        CustomerPhone: {
+          required: true,
+          message: "请输入正确的电话格式",
+          trigger: "blur",
+          validator: validateTel
+        },
+        type: {
+          required: true,
+          message: "预约类型不得为空",
+          trigger: "blur"
+        },
+        ReserveStoreID: {
+          required: true,
+          message: "预约门店不可为空",
+          trigger: "blur"
+        }
+        // ReserveStoreName: { required: true, message: '预约门店不可为空', trigger: 'blur' }
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        userName: ""
+      },
+      columns1: [
+        {
+          title: "预约到店日期",
+          width: 180,
+          key: "ReserveDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.ReserveDate) {
+              return "";
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.ReserveDate).format("YYYY-MM-DD HH:mm:ss")
+            );
+          }
+        },
+        {
+          title: "预约门店",
+          width: 140,
+          key: "StoreName",
+          align: "center"
+        },
+        {
+          title: "项目名称",
+          width: 220,
+          key: "ItemName",
+          align: "center"
+        },
+        {
+          title: "护理师",
+          width: 140,
+          key: "BeauticianName",
+          align: "center"
+        },
+        {
+          title: "客户姓名",
+          key: "CustomerName",
+          width: 140,
+          align: "center"
+        },
+        {
+          title: "电话",
+          key: "CustomerPhone",
+          width: 140,
+          align: "center"
+        },
+        {
+          title: "年龄",
+          width: 140,
+          key: "Age",
+          align: "center"
+        },
+        {
+          title: "性别",
+          width: 140,
+          key: "Sex",
+          align: "center"
+        },
+        {
+          title: "预约类型",
+          width: 140,
+          key: "ReserveTypeName",
+          align: "center"
+        },
+        {
+          title: "经手人",
+          width: 140,
+          key: "HandleByName",
+          align: "center"
+        },
+        {
+          title: "预约状态",
+          width: 140,
+          key: "StatusText",
+          align: "center"
+        },
+        {
+          title: "备注",
+          key: "Remark",
+          align: "center",
+          width: 140,
+          render: (h, parmas) => {
+            if (!parmas.row.Remark) {
+              return "";
+            }
+            let text =
+              parmas.row.Remark.length > 10
+                ? parmas.row.Remark.substr(0, 10) + "...."
+                : parmas.row.Remark;
+            return h(
+              "div",
+              {
+                on: {
+                  click: () => {
+                    this.showRemark(parmas.row);
+                  }
+                }
+              },
+              text
+            );
+          }
+        },
+        {
+          title: " "
+        }
+      ],
+      list: [],
+      storeList: [],
+      // 护理师列表
+      beauticianList: [],
+      jsrList: [],
+      projectLoading: false,
+      reserveTypeList: [],
+      // 有效
+      customerPurchasedList: [],
+      // 无效
+      reserveItemInfoList: [],
+      // 护理师弹窗
+      beauticianModal: false,
+      beauticianMes: {
+        date: new Date()
+      },
+      beauticianTime: false,
+      showDateTime: true,
+      beauticianIndex: 0,
+      timeQuantumArr: [0, 1, 2, 3],
+      beauticianInfo: {
+        name: "",
+        id: ""
+      },
+      Details: [
+        {
+          ScheduleTimeDetailsID: "",
+          Version: ""
+        }
+      ]
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    chooseBeautician(value) {
+      let that = this;
+      that.treatmentReservation.beautician = value;
+    },
+    searchCustomerPhone() {
+      let that = this;
+      let phone = that.formValidate.CustomerPhone;
+      let data = {
+        CustomerPhone: phone,
+        EmployeeID: that.userMes.EmployeeID
+      };
+
+      api.getCustomerByPhone(data).then(res => {
+        if (res.error_code === "Success") {
+          if (res.data.StoreID) {
+            that.haveStore = true;
+            that.storeID = res.data.StoreID;
+            that.formValidate.ReserveStoreName = res.data.StoreName;
+            that.formValidate.ReserveStoreID = res.data.StoreID;
+            that.confirmReserveType = false;
+          } else {
+            that.haveStore = false;
+            that.storeID = "";
+            that.confirmReserveType = true;
+          }
+        } else {
+          that.haveStore = true;
+          that.formValidate.ReserveStoreName = "";
+          that.storeID = "";
+          that.confirmReserveType = true;
+          that.$Message.error(res.error_message);
+        }
+      });
+    },
+    setShortcutMenuAuthor() {
+      let that = this;
+      //项目确诊单(快捷菜单权限验证)
+      let list1 = that.authorList["xmqz"];
+      if (list1) {
+        for (let i of list1) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddXmqz = i.IsVisible;
+          }
+        }
+      } else {
+      }
+      //咨询记录(快捷菜单权限验证)
+      let list2 = that.authorList["zxjl"];
+      if (list2) {
+        for (let i of list2) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddZxjl = i.IsVisible;
+          }
+        }
+      } else {
+      }
+      //到店登记(快捷菜单权限验证)
+      let list3 = that.authorList["dddj"];
+      if (list3) {
+        for (let i of list3) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddComeLog = i.IsVisible;
+          }
+        }
+      } else {
+      }
+
+      that.setShortcutMenuIndex = 0;
+    },
+    addPoups(name) {
+      let that = this;
+      let type = Number(name);
+      if (type == 0) {
+        that.$router.push({
+          name: "xmqz",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 1) {
+        that.$router.push({
+          name: "dddj",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 2) {
+        that.$router.push({
+          name: "zxjl",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+    },
+    showAddPoup() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.reservationType = true;
+      that.$nextTick(() => {
+        that.$refs.searchTel.focus();
+      });
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            that.showAdd = i.IsVisible;
+          }
+          if (i.Name === "取消") {
+            that.showCancel = i.IsVisible;
+          }
+        }
+      }
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+      that.rowPhone = row.truePhone;
+    },
+    changeDate() {
+      let that = this;
+      that.beauticianMes.date = that.treatmentReservation.Date;
+      that.treatmentReservation.projectName = "";
+      that.treatmentReservation.beautician = "";
+    },
+    cancelProject() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条记录");
+        return false;
+      }
+      this.$Modal.confirm({
+        title: "提示",
+        content: "是否取消该预约？",
+        onOk: () => {
+          let data = {
+            ID: that.rowID,
+            EmployeeID: that.userMes.EmployeeID
+          };
+          that.$store.commit("changeLoadingPage");
+          api.cancelRecord(data).then(response => {
+            that.$store.commit("changeLoadingPage");
+            if (response.error_code === "Success") {
+              that.$Message.success("取消成功");
+              that.tablePage.page = 1;
+              that.getList();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        },
+        onCancel: () => {}
+      });
+    },
+    // 添加预约治疗
+    sureTreatment() {
+      let data = {
+        CustomerID: this.customerID,
+        // StoreID: this.userMes.StoreID,
+        StoreID: this.storeID,
+        ReserveDate: moment(this.treatmentReservation.Date).format(
+          "YYYY-MM-DD"
+        ),
+        HandleBy: this.userMes.EmployeeID,
+        ReserveType: 1,
+        CertainProjectID:
+          this.chooseProject.CertainProjectID === undefined
+            ? ""
+            : this.chooseProject.CertainProjectID,
+        ItemID:
+          this.chooseProject.CertainProjectID === undefined
+            ? this.chooseProject.ID
+            : "",
+        BeauticianID: this.beauticianInfo.id,
+        Remark: this.treatmentReservation.Remark,
+        Details: this.Details
+      };
+      // console.log(data);
+      // return;
+      api.sureTreatment(data).then(response => {
+        if (response.error_code === "Success") {
+          this.$Message.success("添加成功");
+          this.treatmentReservationType = false;
+          this.getList();
+        } else {
+          this.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 确定预约护理师
+    sureChoose() {
+      this.beauticianModal = false;
+      this.treatmentReservation.beautician = this.beauticianInfo.name;
+    },
+    // 选择时间段
+    // chooseTimeSlot(id, isCan) {
+    //   if (isCan) {
+    //     let data = {
+    //       ItemID:
+    //         this.chooseProject.ID === undefined
+    //           ? this.chooseProject.ItemID
+    //           : this.chooseProject.ID,
+    //       ScheduleTimeDetailID: id
+    //     };
+    //     // this.Details.ScheduleTimeDetailsID = id
+    //     // this.Details.Version = Version
+    //     api.chooseTimeSlot(data).then(response => {
+    //       if (response.error_code === "Success") {
+    //         this.timeQuantumArr = response.data.list;
+    //         let version = [];
+    //         let timeSlots = [];
+    //         for (let i in this.appointmentList) {
+    //           for (let j in this.timeQuantumArr) {
+    //             if (this.appointmentList[i].ID === this.timeQuantumArr[j]) {
+    //               let Version = this.appointmentList[i].Version;
+    //               let timeSlot = this.appointmentList[i].Caption;
+    //               version.push(Version);
+    //               timeSlots.push(timeSlot);
+    //             }
+    //           }
+    //         }
+    //         this.timeSlot = timeSlots;
+    //         let Details = [];
+    //         for (let i in version) {
+    //           let item = {
+    //             Version: version[i],
+    //             ScheduleTimeDetailsID: this.timeQuantumArr[i]
+    //           };
+    //           Details.push(item);
+    //         }
+    //         this.Details = Details;
+    //       } else {
+    //         this.$Message.error(response.error_message);
+    //       }
+    //     });
+    //   }
+    // },
+    // 选择护理师
+    // chooseBeautician(index) {
+    //   this.beauticianIndex = index;
+    //   this.treatmentReservation.Date = this.beauticianMes.date;
+    //   let data = {
+    //     EmployeeID: this.beauticianList[index].ID,
+    //     Date: moment(this.beauticianMes.date).format("YYYY-MM-DD")
+    //   };
+    //   this.beauticianInfo.name = this.beauticianList[index].Name;
+    //   this.beauticianInfo.id = this.beauticianList[index].ID;
+    //   api.getReservableList(data).then(response => {
+    //     if (response.error_code === "Success") {
+    //       this.appointmentList = response.data.list;
+    //     } else {
+    //       that.$Message.error(response.error_message);
+    //     }
+    //   });
+    // },
+    // 获取护理师列表
+    // getBeauticianList() {
+    //   if (this.treatmentReservation.projectName === "") {
+    //     this.$Message.error("请先选择项目");
+    //   } else {
+    //     this.beauticianModal = true;
+    //     let data = {
+    //       StoreID: this.storeID,
+    //       Date: moment(this.beauticianMes.date).format("YYYY-MM-DD")
+    //     };
+    //     api.getBeauticianList(data).then(response => {
+    //       if (response.error_code === "Success") {
+    //         this.beauticianList = response.data.list;
+    //         this.chooseBeautician(0);
+    //       } else {
+    //         this.$Message.error(response.error_message);
+    //       }
+    //     });
+    //   }
+    // },
+    getBeauticiansByEmployeeID() {
+      this.beauticianModal = true;
+      let data = {
+        EmployeeId: this.userMes.EmployeeID
+      };
+      api.getBeauticiansByEmployeeID(data).then(response => {
+        if (response.error_code === "Success") {
+          this.beauticianList = response.data.list;
+        } else {
+          this.$Message.error(response.error_message);
+        }
+      });
+    },
+    handleClick() {
+      let that = this;
+      that.beauticianTime = !that.beauticianTime;
+    },
+    handleChange(date) {
+      let that = this;
+      that.beauticianMes.date = date;
+    },
+    handleClear() {
+      this.beauticianTime = false;
+    },
+    handleOk() {
+      this.beauticianTime = false;
+    },
+    chooseItem(item) {
+      let that = this;
+      that.chooseProject = item;
+      that.projectSearch = "";
+      that.treatmentReservation.projectName = item.Name
+        ? item.Name
+        : item.ItemName;
+      that.projectListModal = false;
+    },
+    getCustomerPurchasedItems() {
+      // 获取已购项目列表
+      let that = this;
+      let data = {
+        CustomerID: that.customerID,
+        page: 1,
+        size: 1000
+      };
+      that.projectShow = true;
+      api.getCustomerPurchasedItems(data).then(response => {
+        if (response.error_code === "Success") {
+          that.projectShow = false;
+          that.customerPurchasedList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    //获取门店列表
+    getStoreList() {
+      let that = this;
+      api.getValidStores().then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.storeList = res.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    chooseYymd() {
+      let that = this;
+    },
+    getReserveItemInfo() {
+      // 获取未购项目列表(有效项目)
+      let that = this;
+      let data = {
+        page: 1,
+        size: 1000
+      };
+      that.projectShow = true;
+      api.getReserveItemInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.projectShow = false;
+          that.reserveItemInfoList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      //判断两个时间段大小
+      echartsCommon.message = that.$Message;
+      if (
+        echartsCommon.ContrastTime(
+          that.formItem.startDate,
+          that.formItem.endDate
+        )
+      ) {
+        that.tablePage.page = 1;
+        that.getList();
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      // 重置搜索
+      that.$refs.searchForm.resetFields();
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    searchReset() {
+      // 重置输入电话
+      let that = this;
+      that.timeSlot = [];
+      that.$refs.searchTelForm.resetFields();
+      that.poupSearchTel = false;
+    },
+    resetForm() {
+      // 重置选择预约类型
+      let that = this;
+      that.timeSlot = [];
+      that.$refs.formValidate1.resetFields();
+      that.reservationType = false;
+    },
+    chooseType() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          let data = {
+            CustomerPhone: that.formValidate.CustomerPhone,
+            EmployeeID: that.userMes.EmployeeID
+          };
+          that.upLoading = true;
+          api.getCustomerByPhone(data).then(response => {
+            that.upLoading = false;
+            if (response.error_code === "Success") {
+              that.customerID = response.data.ID;
+              if (that.formValidate.type <= 0) {
+                // 到店预约
+                that.shopReservation.type = that.formValidate.type;
+                that.shopReservation.CustomerPhone =
+                  that.formValidate.CustomerPhone;
+                that.shopReservationType = true;
+              } else {
+                // 治疗预约
+                that.treatmentReservationType = true;
+                that.treatmentReservation.CustomerPhone =
+                  that.formValidate.CustomerPhone;
+                that.treatmentReservation.Date = new Date();
+                that.treatmentReservation.projectName = "";
+                that.treatmentReservation.beautician = "";
+                that.timeSlot = [];
+                that.treatmentReservation.Remark = "";
+              }
+              that.reservationType = false;
+              that.formValidate.CustomerPhone = "";
+              that.formValidate.type = "";
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          that.$message.error("请输入正确的手机号");
+        }
+      });
+    },
+    addForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          that.$Message.success("添加成功");
+          that.$refs.formValidate1.resetFields();
+          that.modal1 = false;
+        } else {
+          // this.$Message.error('姓名不得为空');
+        }
+      });
+    },
+    showRemark(row) {
+      // 显示备注
+      let that = this;
+      that.$Modal.info({
+        title: "备注详情",
+        content: row.Remark
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        startDate: that.formItem.startDate,
+        endDate: that.formItem.endDate,
+        CustomerName: that.formItem.userName,
+        CustomerPhone: that.formItem.userTel,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum
+      };
+      // 转换日期
+      if (data.startDate) {
+        data.startDate = moment(data.startDate).format("YYYY-MM-DD");
+      }
+      if (data.endDate) {
+        data.endDate = moment(data.endDate).format("YYYY-MM-DD");
+      }
+      if (data.CustomerPhone) {
+        let regex = /^1\d{10}$/;
+        if (!regex.test(data.CustomerPhone)) {
+          that.$Message.error("电话号码格式有误");
+          return false;
+        }
+      }
+      that.tableLoading = true;
+      api.reservationGetList(data).then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          for (let i of res.list) {
+            let phone = i.CustomerPhone;
+            i.truePhone = phone;
+            i.CustomerPhone =
+              phone.substring(0, 3) + "****" + phone.substr(phone.length - 4);
+          }
+          that.list = res.list;
+          that.tableLoading = false;
+          that.$set(that.tablePage, "page", res.page);
+          that.$set(that.tablePage, "pageNum", res.size);
+          that.$set(that.tablePage, "allNum", res.total);
+          that.tablePage.maxPageNum = res.totalPage;
+          that.setPage();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    addShopReservation() {
+      // 添加到店预约
+      let that = this;
+      let data = {
+        CustomerID: that.customerID,
+        // StoreID: that.userMes.StoreID,
+        StoreID: that.storeID,
+        ReserveDate: moment(that.shopReservation.Date).format(
+          "YYYY-MM-DD HH:mm:ss"
+        ),
+        HandleBy: that.userMes.EmployeeID,
+        ReserveType: that.shopReservation.type,
+        Remark: that.shopReservation.Remark
+      };
+      api.addToShopReservation(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("添加成功");
+          that.resetShopReservation();
+          that.getList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    resetShopReservation() {
+      let that = this;
+      that.$refs.shopReservationType.resetFields();
+      that.shopReservationType = false;
+    },
+    // getStoreList() {
+    //     let that = this
+    //     api.getValidStores().then((response) => {
+    //         if (response.error_code === 'Success') {
+    //             let res = response.data
+    //             that.storeList = res.list
+    //         } else {
+    //             that.$Message.error(response.error_message)
+    //         }
+    //     })
+    // },
+    getReserveTypeList() {
+      // 获取预约类型列表
+      let that = this;
+      api.getReserveType().then(response => {
+        if (response.error_code === "Success") {
+          that.reserveTypeList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    tabChange(index) {
+      let that = this;
+      that.projectTabIndex = index;
+      that.projectShow = true;
+      if (index == 1) {
+        that.getCustomerPurchasedItems();
+      } else {
+        that.getReserveItemInfo();
+      }
+    }
+  },
+  filters: {
+    formatDate(date) {
+      let that = this;
+      if (!date) {
+        return "";
+      }
+      return moment(date).format("MM月DD日");
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.setAuthor();
+      that.initTableHeight();
+      that.getList();
+      that.getStoreList();
+      that.getReserveTypeList();
+      that.setShortcutMenuAuthor();
+      that.getBeauticiansByEmployeeID();
+      // that.getStoreList()
+    });
+  },
+  activated() {
+    let that = this;
+    that.$nextTick(() => {
+      let phone = that.$route.params.phone;
+      if (phone) {
+        // that.$refs.formValidate1.resetFields()
+        // 快捷菜单
+        that.formValidate.CustomerPhone = phone;
+        that.reservationType = true;
+        that.confirmReserveType = true;
+        let employeeID = that.userMes.EmployeeID;
+        let data = {
+          CustomerPhone: phone,
+          EmployeeID: employeeID
+        };
+
+        api.getCustomerByPhone(data).then(res => {
+          if (res.error_code === "Success") {
+            if (res.data.StoreID) {
+              that.storeID = res.data.StoreID;
+              that.formValidate.ReserveStoreName = res.data.StoreName;
+              that.formValidate.ReserveStoreID = res.data.StoreID;
+              that.haveStore = true;
+              that.confirmReserveType = false;
+            } else {
+              that.storeID = "";
+              that.haveStore = false;
+              that.confirmReserveType = true;
+            }
+          } else {
+            that.haveStore = true;
+            that.confirmReserveType = true;
+            that.formValidate.ReserveStoreName = "";
+            that.storeID = "";
+            that.$Message.error(res.error_message);
+          }
+        });
+      }
+    });
+  }
+};
+</script>
+<style>
+/*.vertical-center-modal .ivu-modal-close .ivu-icon-ios-close-empty{
+    display: none;
+}*/
+</style>
+<style scoped>
+.date-box {
+  width: 100%;
+}
+
+.treatmentReservation-dialog .item {
+  overflow: hidden;
+  margin-bottom: 24px;
+  height: 32px;
+  line-height: 32px;
+}
+
+.treatmentReservation-dialog .label {
+  width: 120px;
+  float: left;
+  padding-right: 12px;
+  box-sizing: border-box;
+  font-size: 12px;
+  text-align: right;
+}
+
+.treatmentReservation-dialog .content {
+  margin-left: 120px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  height: 32px;
+  transition: all 0.3s ease;
+  padding: 0 32px 0 7px;
+}
+
+.treatmentReservation-dialog .content:hover {
+  cursor: pointer;
+  border: 1px solid #79aa49;
+}
+
+.treatmentReservation-dialog .content > .icon {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 16px;
+  text-align: center;
+  color: #80848f;
+  position: absolute;
+  right: 0;
+  z-index: 3;
+}
+
+/*选择项目*/
+
+.choose-project .list-content {
+  position: relative;
+  width: 98%;
+  margin: 0 auto;
+  height: 300px;
+  overflow-y: auto;
+}
+
+.choose-project .list-content .item {
+  position: relative;
+  min-height: 166px;
+  border: 1px solid #f5f5f5;
+  border-radius: 4px;
+  width: 96%;
+  padding-top: 40px;
+  margin: 0 auto 10px auto;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.choose-project .list-content .item:hover {
+  border-color: rgba(114, 169, 60, 0.4);
+}
+
+.choose-project .list-content .item .title {
+  position: absolute;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: #fffbee;
+  height: 30px;
+  line-height: 30px;
+  top: 0;
+  left: 0;
+  padding: 0 6px;
+  border-bottom: 2px dashed #eee;
+  overflow: hidden;
+}
+
+.choose-project .list-content .title .left-title {
+  float: left;
+}
+
+.choose-project .list-content .title .right-title {
+  float: right;
+}
+
+.choose-project .list-content .item .content {
+  position: relative;
+  padding: 0 6px;
+}
+
+.choose-project .list-content .content p {
+  margin-bottom: 13px;
+  color: #666;
+  font-size: 12px;
+}
+
+.choose-project .tab-box {
+  position: relative;
+  border-bottom: 1px solid #e9eaec;
+  height: 38px;
+  top: 0;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.choose-project .tab {
+  position: relative;
+  width: 50%;
+  float: left;
+  text-align: center;
+  height: 38px;
+  line-height: 38px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.choose-project .tab:hover {
+  color: #72a93c;
+}
+
+.choose-project .tab.active {
+  color: #72a93c;
+}
+
+.choose-project .tab.active:after {
+  content: "";
+  position: absolute;
+  width: 50px;
+  height: 3px;
+  background: #72a93c;
+  left: 50%;
+  margin-left: -25px;
+  bottom: 0;
+  transition: all 0.2s ease;
+}
+
+.choose-project .ivu-modal-body {
+  position: relative;
+  padding: 50px 0 16px 0;
+}
+
+.choose-project .ivu-modal-footer {
+  padding: 0;
+}
+
+.beautician-item {
+  position: relative;
+  width: 92%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  border-bottom: 1px solid #f6f6f6;
+  margin: 10px auto 0 auto;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.14);
+  padding-right: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.beautician-item:hover {
+  border-bottom: 1px solid #f6f6f6;
+  color: #8cce4a;
+}
+
+.beautician-item:after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 100%;
+  top: 0;
+  right: 0;
+  background: #666666;
+  transition: all 0.2s;
+}
+
+.beautician-item.active:after {
+  background: #8cce4a;
+}
+
+.beautician-timer {
+  width: 100%;
+  height: 100%;
+  padding-top: 60px;
+}
+
+.beautician-timer .title-box {
+  height: 47px;
+  line-height: 47px;
+  position: absolute;
+  top: 0;
+  text-align: center;
+  width: 100%;
+  border-bottom: 1px solid #f6f6f6;
+}
+
+.beautician-timer .content {
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.beautician-timer .item {
+  display: flex;
+  align-items: center;
+  width: 25%;
+  margin-bottom: 36px;
+  cursor: pointer;
+}
+
+.beautician-timer .item {
+  color: rgb(102, 102, 102);
+  font-size: 12px;
+}
+
+.beautician-timer i {
+  font-size: 18px;
+  margin-right: 6px;
+}
+
+.beautician-timer .item:hover {
+  color: #8cce4a;
+}
+
+.beautician-timer .item.disable .text {
+  color: #999;
+  text-decoration: line-through;
+}
+
+.beautician-timer .item.disable:hover {
+  color: #999;
+}
+</style>

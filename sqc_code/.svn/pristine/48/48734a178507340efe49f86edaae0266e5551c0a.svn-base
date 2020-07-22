@@ -1,0 +1,646 @@
+<template>
+    <div class="yggl-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+                <row :gutter="20">
+                    <!-- 厂家名称 -->
+                    <i-col span="3">
+                        <FormItem prop="Name">
+                            <Input v-model="formItem.Name" placeholder="权限名称"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="21">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="getList">搜索</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                            <i-button type="primary" class="btn btn-add" @click="showAddPoup" v-if="setAuthorAdd">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="modefyMessage" v-if="setAuthorEdit" :disabled="!rowID">修改</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="getRowID"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+        </div>
+        <!-- 新增弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" class="dialog" :styles="{position:'relative', top: '0px',width:'1000px',height:'100%',overflow:'scroll'}" v-if="setAuthorAdd || setAuthorEdit">
+            <div slot='header' class="header">
+                {{modalTitle}}
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="140" @submit.native.prevent class="form">
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="RoleName" label="权限名称：" :rules="formValidateRule.RoleName">
+                            <Input v-model="formValidate.RoleName" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="DefaultControllerCategoryID" label="默认顶级菜单：" :rules="formValidateRule.DefaultControllerCategoryID" v-if="formValidate.DefaultControllerCategoryID">
+                            <Select v-model="formValidate.DefaultControllerCategoryID" @on-change="getPageUrl" filterable clearable>
+                                <Option v-for="item in defaultPoupList" :value="item.ID" :key="item.ID">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                        <FormItem prop="DefaultControllerCategoryID" label="默认顶级菜单：" v-else>
+                            <!-- <FormItem prop="DefaultControllerCategoryID" label="默认顶级菜单：" v-show="!formValidate.DefaultControllerCategoryID"> -->
+                            <Select v-model="formValidate.DefaultControllerCategoryID" @on-change="getPageUrl" filterable clearable>
+                                <Option v-for="item in defaultPoupList" :value="item.ID" :key="item.ID">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <template v-if="showLevelTwo">
+                            <FormItem prop="DefaultControllerID" label="默认显示菜单：" :rules="formValidateRule.DefaultControllerID" v-if="formValidate.DefaultControllerCategoryID">
+                                <Select v-model="formValidate.DefaultControllerID" filterable clearable not-found-text="请先选择默认顶级菜单">
+                                    <Option v-for="item in pageUrlList" :value="item.ID" :key="item.ID">{{ item.Name }}</Option>
+                                </Select>
+                            </FormItem>
+                            <FormItem prop="DefaultControllerID" label="默认显示菜单：" v-else>
+                                <Select v-model="formValidate.DefaultControllerID" filterable clearable not-found-text="请先选择默认顶级菜单">
+                                    <Option v-for="item in pageUrlList" :value="item.ID" :key="item.ID">{{ item.Name }}</Option>
+                                </Select>
+                            </FormItem>
+                        </template>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <div class="box" v-for="(item, index) in actionList" :key="index">
+                            <div>
+                                <div class="title" style="padding-left: 25px;position:relative;border-bottom: 1px solid #e9e9e9;padding-bottom:6px;height: 40px;line-height:40px; width:100%; font-size:16px; margin-bottom: 10px">{{item.TopMenuName}}</div>
+                                <div v-for="(i, index1) in item.SubMenuList" class="qx-container" :key="index1">
+                                    <div class="wrapper">
+                                        <Checkbox :indeterminate="i.indeterminate" :value="i.checkAll" @click.prevent.native="handleCheckAll(i)">{{i.SubMenuName}}
+                                        </Checkbox>
+                                    </div>
+                                    <div class="content" style="margin-bottom:10px;">
+                                        <CheckboxGroup v-model="authorityList" @on-change="checkAllGroupChange">
+                                            <Checkbox :label="j.ID" v-for="(j, index2) in i.ActionList" :key="index2" style="margin-right:20px;" @click.prevent.native="handleSigle(j, i)">{{j.Name}}</Checkbox>
+                                        </CheckboxGroup>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </i-col>
+                </row>
+            </Form>
+            <!-- style="position:fixed;right: 464px;bottom: 16px;" -->
+            <div slot="footer" class="footer" style="position:absolute;right: 0px;bottom: 0px;">
+                <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+                <Button type="warning" class="btn" @click="resetForm" :loading="loading">取消</Button>
+            </div>
+        </Modal>
+        <!-- ** -->
+    </div>
+</template>
+<script>
+import superManager from "@/api/super.js";
+import { mapState } from "vuex";
+export default {
+  data() {
+    return {
+      showLevelTwo: true,
+      loading: false,
+      tableLoading: false,
+      tableHeight: 200,
+      modalTitle: "修改",
+      modal1: false,
+      rowID: null,
+      // 添加弹窗用
+      formValidate: {
+        ID: "",
+        RoleName: "",
+        DefaultControllerID: "",
+        DefaultControllerCategoryID: ""
+      },
+      formValidateRule: {
+        RoleName: {
+          required: true,
+          message: "权限名称不得为空",
+          trigger: "blur"
+        },
+        DefaultControllerID: {
+          required: true,
+          message: "默认页面路径不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        DefaultControllerCategoryID: {
+          required: true,
+          message: "默认顶级菜单编号不得为空",
+          trigger: "blur",
+          type: "number"
+        }
+      },
+      formItem: {
+        Name: ""
+      },
+      columns1: [
+        {
+          title: "权限名称",
+          key: "RoleName",
+          align: "center"
+        },
+        {
+          title: "默认顶级菜单",
+          key: "DefaultControllerCategoryName",
+          align: "center"
+        },
+        {
+          title: "默认二级菜单",
+          key: "DefaultControllerName",
+          align: "center"
+        }
+      ],
+      list: [],
+      defaultPoupList: [],
+      pageUrlList: [],
+      actionList: [],
+      authorityList: [],
+      roleDetails: [],
+      getSubListIndex: 0
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    },
+    setAuthorAdd() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      }
+      return false;
+    },
+    setAuthorEdit() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "修改") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      }
+      return false;
+    }
+  },
+  methods: {
+    showAddPoup() {
+      let that = this;
+      that.resetForm();
+      setTimeout(() => {
+        that.modal1 = true;
+        that.modalTitle = "新建";
+      }, 200);
+    },
+    getPageUrl(val) {
+      let that = this;
+      // console.error(val)
+      // if (!val) {
+      //     console.error('修改1')
+      //     that.pageUrlList = []
+      //     return false
+      // }
+      // if (that.getSubListIndex > 0) {
+      //     // 切换默认顶级菜单时清空默认显示菜单的值
+      //     that.formValidate.DefaultControllerID = ''
+      // }
+      // that.getSubListIndex++
+      if (!val) {
+        return false;
+      }
+      let data = {
+        TopMenuID: val
+      };
+      that.$store.commit("changeLoadingPage");
+      superManager.getSubMenuDropdownListByTopMenuID(data).then(response => {
+        if (response.error_code === "Success") {
+          // that.formValidate.DefaultControllerID = ''
+          that.$set(that.formValidate, "DefaultControllerID", "");
+          that.showLevelTwo = false;
+          that.pageUrlList = [];
+          that.pageUrlList = response.data.list;
+          setTimeout(() => {
+            that.showLevelTwo = true;
+            that.$store.commit("changeLoadingPage");
+          }, 50);
+          return false;
+        } else {
+          that.$store.commit("changeLoadingPage");
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    handleCheckAll(type) {
+      // 全选
+      let that = this;
+      type.checkAll = !type.checkAll;
+      let len = 0;
+      let IDarr = [];
+      for (let i of type.ActionList) {
+        let ID = i.ID;
+        IDarr.push(ID);
+        let index = that.authorityList.indexOf(ID);
+        if (index > -1) {
+          // 匹配 先删除
+          that.authorityList.splice(index, 1);
+          len++;
+        }
+      }
+      type.indeterminate = false;
+      if (len <= 0) {
+        type.checkAll = true;
+        for (let j of IDarr) {
+          that.authorityList.push(j);
+        }
+      } else {
+        type.checkAll = false;
+      }
+    },
+    checkAllGroupChange(data) {},
+    handleSigle(type, prev) {
+      let that = this;
+      let ID = type.ID;
+      let index = that.authorityList.indexOf(ID);
+      if (index > -1) {
+        that.authorityList.splice(index, 1);
+        prev.checkAll = false;
+        prev.indeterminate = true;
+      } else {
+        that.authorityList.push(ID);
+      }
+      let len = 0;
+      for (let i of prev.ActionList) {
+        let a = that.authorityList.indexOf(i.ID);
+        if (a > -1) {
+          len++;
+        }
+      }
+      if (len >= prev.ActionList.length) {
+        // 全选
+        prev.checkAll = true;
+        prev.indeterminate = false;
+      } else if (len > 0) {
+        // 选中部分
+        prev.checkAll = false;
+        prev.indeterminate = true;
+      } else {
+        prev.checkAll = false;
+        prev.indeterminate = false;
+      }
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    searchCustomerTel() {
+      let that = this;
+      that.$refs.searchTelForm.validate(validate => {
+        if (validate) {
+          // 搜索...
+          that.$refs.searchTelForm.resetFields();
+          that.poupSearchTel = false;
+          that.modal1 = true;
+          that.modalTitle = "新增";
+        } else {
+          that.$Message.error("请输入用户的联系电话");
+        }
+      });
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.RoleID;
+    },
+    modefyMessage(row) {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条记录");
+        return false;
+      }
+      that.resetForm();
+      that.$store.commit("changeLoadingPage");
+      that.getSubListIndex = 0;
+      superManager.getRoleDetail(that.rowID).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          let res = response.data;
+          // that.formValidate.ID = res.ID
+          // that.formValidate.RoleName = res.Name
+          // that.formValidate.DefaultControllerID = res.DefaultControllerCategoryID
+          // that.formValidate.DefaultControllerCategoryID = res.DefaultControllerCategoryID
+          that.formValidate = {
+            ID: res.ID,
+            RoleName: res.Name,
+            DefaultControllerID: res.DefaultControllerID,
+            DefaultControllerCategoryID: res.DefaultControllerCategoryID
+          };
+          that.authorityList = [];
+          for (let i of res.RoleDetails) {
+            if (i.IsAllow) {
+              that.authorityList.push(i.ActionID);
+            }
+          }
+          // that.getPageUrl(res.DefaultControllerCategoryID)
+          let data = {
+            TopMenuID: res.DefaultControllerCategoryID
+          };
+          superManager.getSubMenuDropdownListByTopMenuID(data).then(ra => {
+            if (ra.error_code === "Success") {
+              that.pageUrlList = ra.data.list;
+              that.formValidate.DefaultControllerID = res.DefaultControllerID;
+              that.getSubListIndex++;
+              that.modal1 = true;
+            } else {
+              that.$Message.error(ra.error_message);
+            }
+          });
+          that.modefySetData();
+          that.modalTitle = "修改";
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    resetForm() {
+      let that = this;
+      that.formValidate.DefaultControllerID = "";
+      that.formValidate.DefaultControllerCategoryID = "";
+      that.$set(that.formValidate, "DefaultControllerID", null);
+      that.$refs.formValidate1.resetFields();
+      that.formValidate.ID = "";
+      that.authorityList = [];
+      that.getSubListIndex = 0;
+      that.pageUrlList = [];
+      // 重置选中列表
+      for (let i of that.actionList) {
+        i.indeterminate = false;
+        for (let j of i.SubMenuList) {
+          j.indeterminate = false;
+          j.checkAll = false;
+          for (let z of j.ActionList) {
+            z.IsAllow = false;
+          }
+        }
+      }
+      // 重置权限数据
+      for (let i of that.roleDetails) {
+        i.IsAllow = false;
+      }
+      that.modal1 = false;
+    },
+    addForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          if (that.authorityList.length <= 0) {
+            that.$Message.error("请选择角色的权限");
+            return false;
+          }
+          let data = that.setData();
+          if (!data) {
+            return false;
+          }
+          that.$store.commit("changeLoadingPage");
+          if (that.formValidate.ID) {
+            that.changeDetails(data);
+            return false;
+          }
+          that.loading = true;
+          superManager.addRoles(data).then(response => {
+            that.$store.commit("changeLoadingPage");
+            that.loading = false;
+            if (response.error_code === "Success") {
+              that.$Message.success("提交成功");
+              that.getList();
+              that.resetForm();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          that.$Message.error("有必填项为空");
+        }
+      });
+    },
+    changeDetails(data) {
+      // 修改文件
+      let that = this;
+      that.loading = true;
+      superManager.modefyRoles(that.formValidate.ID, data).then(response => {
+        that.loading = false;
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.resetForm();
+          that.getList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setData() {
+      // 设置权限数据
+      let that = this;
+      let data = {
+        RoleName: that.formValidate.RoleName,
+        DefaultControllerID: that.formValidate.DefaultControllerID,
+        DefaultControllerCategoryID:
+          that.formValidate.DefaultControllerCategoryID,
+        RoleDetails: []
+      };
+      for (let i of that.authorityList) {
+        for (let j of that.roleDetails) {
+          if (i === j.ActionID) {
+            j.IsAllow = true;
+          }
+        }
+      }
+      data.RoleDetails = that.roleDetails;
+      return data;
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    getList() {
+      let that = this;
+      let data = {
+        Name: that.formItem.Name
+      };
+      that.tableLoading = true;
+      superManager.getRoleList(data).then(response => {
+        that.tableLoading = false;
+        if (response.error_code === "Success") {
+          that.list = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getDropDownList() {
+      // 获取权限列表
+      let that = this;
+      superManager.getRoleActionList().then(response => {
+        if (response.error_code === "Success") {
+          let list = response.data.list;
+          let arr = [];
+          for (let i in list) {
+            let data = {
+              TopMenuName: list[i].TopMenuName,
+              indeterminate: false,
+              SubMenuList: []
+            };
+            arr.push(data);
+            for (let j in list[i].SubMenuList) {
+              let dom = list[i].SubMenuList[j];
+              let d = {
+                SubMenuName: dom.SubMenuName,
+                indeterminate: false,
+                checkAll: false,
+                ActionList: []
+              };
+              arr[i].SubMenuList.push(d);
+              for (let z in dom.ActionList) {
+                arr[i].SubMenuList[j].ActionList.push(dom.ActionList[z]);
+                let a = {
+                  ActionID: dom.ActionList[z].ID,
+                  IsAllow: false
+                };
+                that.roleDetails.push(a);
+              }
+            }
+          }
+          that.actionList = arr;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getDropdownListData() {
+      let that = this;
+      superManager.getDropdownListData().then(response => {
+        if (response.error_code === "Success") {
+          that.defaultPoupList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    modefySetData() {
+      // 编辑时判断元素全选
+      let that = this;
+      for (let i of that.actionList) {
+        for (let j of i.SubMenuList) {
+          let type = 0;
+          for (let z of j.ActionList) {
+            let index = that.authorityList.indexOf(z.ID);
+            if (index > -1) {
+              type++;
+            }
+          }
+          if (type >= j.ActionList.length) {
+            // 全选
+            j.checkAll = true;
+            j.indeterminate = false;
+          } else if (type > 0) {
+            // 选部分
+            j.checkAll = false;
+            j.indeterminate = true;
+          } else {
+            j.checkAll = false;
+            j.indeterminate = false;
+          }
+        }
+      }
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.getDropDownList();
+      that.getDropdownListData();
+    });
+  }
+};
+</script>
+<style>
+.box .title:before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  left: 0;
+  height: 20px;
+  background: #79aa49;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 10px;
+}
+.qx-container {
+  position: relative;
+  margin-bottom: 10px;
+  box-shadow: 3px 0px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  padding: 0px 10px 0 240px;
+}
+.qx-container .wrapper {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 240px;
+  height: 43px;
+  padding-left: 30px;
+  line-height: 43px;
+}
+.qx-container .content {
+  border-left: 1px dashed #999;
+  padding-left: 5px;
+}
+.qx-container .content > div {
+  min-height: 43px;
+  line-height: 43px;
+}
+</style>

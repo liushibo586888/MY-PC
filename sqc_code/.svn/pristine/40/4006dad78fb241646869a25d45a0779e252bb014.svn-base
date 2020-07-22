@@ -1,0 +1,287 @@
+<template>
+  <div class="cnjs-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="StartDate">
+
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="EndDate">
+
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <!-- <Option value="all" @click.native="choose()">所有</Option> -->
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="15">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row :height="tableHeight" ref="mainTable"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <div class="bottom-box">
+      <i-button class="btn" @click="exportTable" type="default">导出</i-button>
+      <i-button class="btn" @click="printPage()" type="primary">打印</i-button>
+      <!-- <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost">上一页</i-button>
+            <i-button class="btn btn-next" type="primary">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" :value="1"></Input-number>
+                <p>页</p>
+            </div> -->
+    </div>
+    <!-- 打印 -->
+    <div class="print-box">
+      <div class="title">护理师手工统计</div>
+      <Row>
+        <i-col span="24">
+          <span class="print-name">门店：</span>
+          <span class="print-key">{{formItem.store}}</span>
+        </i-col>
+      </Row>
+      <Row v-if="formItem.StartDate">
+        <i-col span="24">
+          <span class="print-key" v-if="formItem.StartDate">{{formItem.StartDate | formatDate}}</span>
+          <span class="print-key" v-if="formItem.StartDate && formItem.EndDate">至</span>
+          <span class="print-key" v-if="formItem.EndDate">{{formItem.EndDate | formatDate}}</span>
+        </i-col>
+      </Row>
+      <div class="line"></div>
+      <Row>
+        <i-col span="8">护理师</i-col>
+        <i-col span="8">门店</i-col>
+        <i-col span="8">次数</i-col>
+      </Row>
+      <Row v-for="(item, index) in list" :key="index">
+        <i-col span="8">{{item.BeauticianName}}</i-col>
+        <i-col span="8">{{item.StoreName}}</i-col>
+        <i-col span="8">{{item.Num}}</i-col>
+      </Row>
+      <div class="line"></div>
+      <div class="bottom">{{userMes.BottomDescription}}</div>
+    </div>
+    <!-- ** -->
+  </div>
+</template>
+<script>
+// import { getCashierStatement } from '@/api/index.js'
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 200,
+      formItem: {
+        StartDate: new Date(),
+        EndDate: new Date(),
+        store: "",
+        EmployeeID: "",
+        StoreID:""
+      },
+      columns1: [
+        {
+          title: "美容师",
+          key: "BeauticianName",
+          align: "center",
+          width: 600
+        },
+        {
+          title: "门店",
+          key: "StoreName",
+          align: "center",
+          width: 400
+        },
+        {
+          title: "次数",
+          key: "Num",
+          align: "center",
+          width: 600,
+          render: (h, parmas) => {
+            let Num = Number(parmas.row.Num);
+            return h("div", {}, Num);
+          }
+        }
+      ],
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      authorList: state => state.app.authorList,
+      userMes: state => state.app.userMes
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    resetSearch() {
+      // 重置搜索
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      if (that.formItem.StartDate && that.formItem.EndDate) {
+        // 两者同时存在
+        if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        } else {
+          // console.log('搜索')
+          that.tableLoading = true;
+          that.getList();
+        }
+      }
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    getList() {
+      let that = this;
+      let userMessage = JSON.parse(localStorage.userMessage);
+      that.formItem.EmployeeID = userMessage.EmployeeID;
+      let data = that.formItem;
+      if (data.StartDate) {
+        data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        that.formItem.StartDate = data.StartDate;
+      }
+      if (data.EndDate) {
+        data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        that.formItem.EndDate = data.EndDate;
+      }
+      console.log(that.formItem);
+
+      api.getBeauticianAchievements(that.formItem).then(response => {
+        if (response.error_code === "Success") {
+          that.tableLoading = false;
+          that.list = response.data.list;
+          //  console.log(that.list);
+          // let a = {
+          //   PayModeName: "合计",
+          //   Amount: 0
+          // };
+          // for (let i of response.data.list) {
+          //   a.Amount += Number(i.Amount);
+          // }
+          // if (that.list.length > 0) {
+          //   that.list.push(a);
+          // }
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      api.getValidStores().then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.store=that.storeList[0].Name;
+          that.formItem.StoreID=that.storeList[0].ID
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    printPage() {
+      let that = this;
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    },
+    choose(name, id) {
+      // if (name === undefined && id === undefined) {
+      //   this.formItem.store = "所有";
+      //   this.formItem.StoreID =null;
+      // } else {
+        this.formItem.store = name;
+        this.formItem.StoreID = id;
+      // }
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.getStore();
+      // let pageName = that.$route.name
+      // let list = that.authorList[pageName]
+    });
+  },
+  filters: {
+    formatDate(val) {
+      return moment(val).format("YYYY-MM-DD");
+    }
+  }
+};
+</script>
+<style>
+</style>
+

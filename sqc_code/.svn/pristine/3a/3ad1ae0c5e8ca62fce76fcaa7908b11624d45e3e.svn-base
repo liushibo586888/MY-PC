@@ -1,0 +1,487 @@
+<template>
+    <div class="zwgl-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+                <row :gutter="20">
+                    <!-- 仪器名称 -->
+                    <i-col span="3">
+                        <FormItem prop="Name">
+                            <Input v-model="formItem.Name" placeholder="门店名称"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="Valid">
+                            <Select v-model="formItem.Valid" placeholder="是否有效">
+                                <Option :value="-1">全部</Option>
+                                <Option :value="1">有效</Option>
+                                <Option :value="0">无效</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="18">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="searchList">搜索</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                            <i-button type="primary" class="btn btn-add" @click="showAddPoup" v-if="setAuthorAdd">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="getDetail" v-if="setAuthorEdit" :disabled="!rowID">修改</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+            <Table :columns="columns1" highlight-row :data="list" :height="setTableHeight" ref="mainTable" :loading="tableLoading" @on-current-change="getRowID"></Table>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <!-- <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button type="ghost" class="btn">上一页</i-button>
+            <i-button type="primary" class="btn">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" :value="1"></Input-number>
+                <p>页</p>
+            </div> -->
+        </div>
+        <!-- 新增弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" class="dialog" class-name="vertical-center-modal" v-if="setAuthorAdd || setAuthorEdit">
+            <div slot='header' class="header">
+                {{modalTitle}}
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="Name" label="门店名称：" :rules="formValidateRule.Name">
+                            <Input v-model="formValidate.Name" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="StoreAlias" label="门店别名：" :rules="formValidateRule.StoreAlias">
+                            <Input v-model="formValidate.StoreAlias" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="Phone" label="联系电话：">
+                            <Input v-model="formValidate.Phone" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="Address" label="门店地址：" :rules="formValidateRule.Address">
+                            <Input v-model="formValidate.Address" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+
+
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <i-col span="12">
+                        <FormItem prop="ProvinceName" label="所在地区：">
+                            <Select v-model="formValidate.ProvinceName" placeholder="省市" :filterable="true">
+                                <Option v-for="(item,index) in ProvinceList" :value="item.Name" :key="index" @click.native="choose(item.Name,item.Id)">{{ item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                        </i-col>
+                         <i-col span="12">
+                            <FormItem prop="CityName">
+                            <Select v-model="formValidate.CityName" placeholder="区域" :filterable="true">
+                                <Option v-for="(item,index) in CityList" :value="item.Name" :key="index">{{ item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                         </i-col>
+                    </i-col>
+                </row>
+
+
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="PrinterIPAddress" label="打印机IP：" :rules="formValidateRule.PrinterIPAddress">
+                            <Input v-model="formValidate.PrinterIPAddress" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="LogoImgURL" label="门店LOGO地址：">
+                            <Input v-model="formValidate.LogoImgURL" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row>
+                    <i-col span="24">
+                        <FormItem prop="Valid" label="是否有效：" :rules="formValidateRule.Valid">
+                            <RadioGroup v-model="formValidate.Valid">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row>
+                    <i-col span="24">
+                        <FormItem prop="Remark" label="备注：">
+                            <Input v-model="formValidate.Remark" placeholder="请输入" type="textarea"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+            </Form>
+            <div slot="footer" class="footer">
+                <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+                <Button type="warning" class="btn" @click="resetForm" :loading="loading">取消</Button>
+            </div>
+        </Modal>
+
+    </div>
+</template>
+<script>
+import manager from "@/api/manager.js";
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+export default {
+  data() {
+    return {
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      rowID: null,
+      tableLoading: false,
+      loading: false,
+      tableHeight: 200,
+      modalTitle: "修改",
+      modal1: false,
+      // 添加弹窗用
+      formValidate: {
+        Name: "",
+        Phone: "",
+        Address: "",
+        PrinterIPAddress: "",
+        LogoImgURL: "",
+        Remark: "",
+        Valid: 1,
+        StoreAlias: "",
+        ProvinceId: "",
+        ProvinceName: "",
+        CityName: ""
+      },
+      formValidateRule: {
+        Name: {
+          required: true,
+          message: "门店名称不得为空",
+          trigger: "blur"
+        },
+        StoreAlias: {
+          required: true,
+          message: "门店别名不得为空",
+          trigger: "blur"
+        },
+        Valid: {
+          required: true,
+          message: "是否有效不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        Address: {
+          required: true,
+          message: "地址不得为空",
+          trigger: "blur"
+        },
+        PrinterIPAddress: {
+          required: true,
+          message: "打印机IP不得为空",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        mdmc: "",
+        sfyx: ""
+      },
+      columns1: [
+        {
+          title: "门店名称",
+          key: "Name",
+          align: "center"
+        },
+        {
+          title: "门店别名",
+          key: "StoreAlias",
+          align: "center"
+        },
+        {
+          title: "联系电话",
+          key: "Phone",
+          align: "center"
+        },
+        {
+          title: "门店地址",
+          key: "Address",
+          align: "center"
+        },
+        {
+          title: "门店所在区",
+          key: "CityName",
+          align: "center"
+        },
+        {
+          title: "打印机IP",
+          key: "PrinterIPAddress",
+          align: "center"
+        },
+        {
+          title: "门店LOGO地址",
+          key: "LogoImgAddress",
+          align: "center"
+        },
+        {
+          title: "备注",
+          key: "Remark",
+          align: "center"
+        },
+        {
+          title: "是否有效",
+          key: "Valid",
+          align: "center",
+          render: (h, params) => {
+            let text = params.row.Valid ? "是" : "否";
+            return h("div", {}, text);
+          }
+        }
+      ],
+      list: [],
+      ProvinceList: [],
+      CityList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    },
+    setAuthorAdd() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    },
+    setAuthorEdit() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "修改") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    choose(name, id) {
+      let that = this;
+      that.formItem.ProvinceName = name;
+      that.formItem.ProvinceId = id;
+      let data = {
+        pid: that.formItem.ProvinceId
+      };
+      manager.getCityList(data).then(response => {
+        console.log(response.data);
+        for (let i = 0; i < response.data.length; i++) {
+          const city = response.data[i];
+          that.CityList.push(city);
+        }
+      });
+      console.log(this.formItem.ProvinceId);
+    },
+    getCityIdList() {
+      //获取所在区列表
+      let that = this;
+      manager.getProvinceList().then(response => {
+        // console.log(response.data);
+        for (let i = 0; i < response.data.length; i++) {
+          const element = response.data[i];
+          that.ProvinceList.push(element);
+        }
+      });
+    },
+    showAddPoup() {
+      let that = this;
+      that.resetForm();
+      that.modal1 = true;
+      that.modalTitle = "新建";
+    },
+    searchList() {
+      let that = this;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    modefyMessage(data) {
+      let that = this;
+      manager.modefySingleStores(that.formValidate.ID, data).then(response => {
+        that.loading = false;
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.resetForm();
+          that.getList();
+        } else {
+          this.$Message.error(response.error_message);
+        }
+      });
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    addForm() {
+      // 添加
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          let d = that.formValidate;
+          let data = {
+            StoreAlias: d.StoreAlias,
+            Name: d.Name,
+            Phone: d.Phone,
+            Address: d.Address,
+            PrinterIPAddress: d.PrinterIPAddress,
+            LogoImgURL: d.LogoImgURL,
+            Remark: d.Remark,
+            Valid: d.Valid > 0 ? true : false,
+            CityName: d.CityName //所在区
+          };
+          that.loading = true;
+          if (that.modalTitle == "修改") {
+            that.modefyMessage(data);
+            return false;
+          }
+          manager.addStores(data).then(response => {
+            that.loading = false;
+            if (response.error_code === "Success") {
+              that.$Message.success("添加成功");
+              that.resetForm();
+              that.getList();
+            } else {
+              this.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          this.$Message.error("有必填项为空");
+        }
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    getList() {
+      let that = this;
+      that.tableLoading = true;
+      let data = {
+        Name: that.formItem.Name
+      };
+      if (that.formItem.Valid === 1) {
+        data.Valid = true;
+      } else if (that.formItem.Valid === 0) {
+        data.Valid = false;
+      }
+      manager.getStoresList(data).then(response => {
+        that.tableLoading = false;
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.list = res.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+    },
+    getDetail() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条记录");
+        return false;
+      }
+      that.$store.commit("changeLoadingPage");
+      manager.getSingleStores(that.rowID).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          //   console.log(response);
+          that.formValidate = response.data;
+          that.formValidate.Valid = response.data.Valid ? 1 : 0;
+          that.modalTitle = "修改";
+          that.modal1 = true;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.getCityIdList();
+    });
+  }
+};
+</script>
+<style>
+</style>

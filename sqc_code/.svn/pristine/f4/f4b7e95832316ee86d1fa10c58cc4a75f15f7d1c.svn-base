@@ -1,0 +1,346 @@
+<template>
+  <div class="QYjysh-container container">
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          新客项目分类
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+export default {
+  props: [
+    "date",
+    "vall",
+    "startDate",
+    "endDate",
+    "sCity",
+    "MDid",
+    "choosedItemList",
+    "storeList",
+    "ItemId"
+  ],
+  data() {
+    return {
+      spinShow: true
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    })
+  },
+  methods: {
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          reportType: that.vall,
+          startDate: that.startDate,
+          endDate: that.endDate,
+          areaID: that.sCity,
+          storeId: that.MDid,
+          employeeId: that.userMes.EmployeeID,
+          ItemId: that.ItemId,
+          ListModels: that.choosedItemList
+        };
+        data.startDate = moment(that.startDate).format("YYYY-MM-DD");
+        data.endDate = moment(that.endDate).format("YYYY-MM-DD");
+        let temp = JSON.parse(JSON.stringify(data));
+        if (that.vall == 4) {
+          temp.areaID = "10";
+          temp.reportType = 2;
+          let arr = that.storeList;
+          arr.forEach(v => {
+            temp.ListModels.push({
+              startDate: temp.startDate,
+              endDate: temp.endDate,
+              areaID: v.ID,
+              storeId: that.MDid
+            });
+          });
+        }
+        temp.ListModels.forEach(x => delete x.arr);
+        that.spinShow = true;
+        api.AreaNewCustomerItemConsumeReport(temp).then(response => {
+          if (response.error_code === "Success") {
+            that.list = response.data;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 200);
+    },
+    setPieData() {
+      let that = this;
+      let NewCustDan = [];
+      let NewCustAmount = [];
+      let CountCustDan = [];
+      let CounCustAmount = [];
+      let Name = [];
+      let Heji = [];
+      for (let i in that.list) {
+        let a = {
+          NewCustDan: that.list[i].NewCustomerPrice.toFixed(2),
+          NewCustAmount: that.list[i].NewCustomerCous.toFixed(2),
+          CountCustDan: that.list[i].TotalPrice.toFixed(2),
+          CounCustAmount: that.list[i].TotalCous.toFixed(2),
+          Name: that.list[i].StoreName
+        };
+
+        NewCustDan.push(a.NewCustDan);
+        NewCustAmount.push(a.NewCustAmount);
+        CountCustDan.push(a.CountCustDan);
+        CounCustAmount.push(a.CounCustAmount);
+        Name.push(a.Name);
+        Heji.push(
+          Number(a.NewCustDan) +
+            Number(a.NewCustAmount) +
+            Number(a.CountCustDan) +
+            Number(a.CounCustAmount)
+        );
+      }
+      // console.log(Heji)
+      let data3 = [];
+      for (let i = 0; i < Heji.length; i++) {
+        let a = {
+          value: Heji[i].toFixed(2),
+          xAxis: i,
+          yAxis: Heji[i].toFixed(2)
+        };
+        data3.push(a);
+      }
+      that.setEcharts(
+        NewCustDan,
+        NewCustAmount,
+        CountCustDan,
+        CounCustAmount,
+        Name,
+        data3
+      );
+    },
+
+    setEcharts(
+      NewCustDan,
+      NewCustAmount,
+      CountCustDan,
+      CounCustAmount,
+      Name,
+      data3
+    ) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: ["#003366", "#006699", "#4cabce", "#e5323e"],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              type: "shadow"
+            }
+          },
+          legend: {
+            data: ["新客客单", "新客消费", "总客客单", "总客消费"]
+          },
+          toolbox: {
+            show: true,
+            orient: "vertical",
+            left: "right",
+            top: "center",
+            feature: {
+              mark: { show: true },
+              dataView: { show: true, readOnly: false },
+              magicType: {
+                show: true,
+                type: ["line", "bar", "stack", "tiled"]
+              },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
+          },
+          calculable: true,
+          xAxis: [
+            {
+              type: "category",
+              axisTick: { show: false },
+              data: Name,
+             // axisLabel: echartsCommon.axisLabel()
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+            }
+          ],
+          series: [
+            {
+              name: "新客客单",
+              type: "bar",
+              barGap: 0,
+              data: NewCustDan,
+              itemStyle: echartsCommon.itemStyle(10)
+            },
+            {
+              name: "新客消费",
+              type: "bar",
+              data: NewCustAmount,
+              itemStyle: echartsCommon.itemStyle(10)
+            },
+            {
+              name: "总客客单",
+              type: "bar",
+              data: CountCustDan,
+              itemStyle: echartsCommon.itemStyle(10)
+            },
+            {
+              name: "总客消费",
+              type: "bar",
+              data: CounCustAmount,
+              itemStyle: echartsCommon.itemStyle(10)
+            }
+          ]
+          // tooltip: {
+          //   trigger: "axis",
+          //   axisPointer: {
+          //     // 坐标轴指示器，坐标轴触发有效
+          //     type: "shadow" // 默认为直线，可选为：'line' | 'shadow'
+          //   }
+          // },
+          // legend: {
+          //   data: ["新客客单", "新客消费", "总客客单", "总客消费"]
+          // },
+          // grid: {
+          //   left: "3%",
+          //   right: "4%",
+          //   bottom: "3%",
+          //   containLabel: true
+          // },
+          // yAxis: {
+          //   type: "value"
+          // },
+          // xAxis: {
+          //   type: "category",
+          //   data: Name
+          // },
+          // series: [
+          //   {
+          //     name: "新客客单",
+          //     type: "bar",
+          //     stack: "总量",
+          //     label: {
+          //       normal: {
+          //         show: true
+          //       }
+          //     },
+          //     data: NewCustDan
+          //   },
+          //   {
+          //     name: "新客消费",
+          //     type: "bar",
+          //     stack: "总量",
+          //     label: {
+          //       normal: {
+          //         show: true
+          //       }
+          //     },
+          //     data: NewCustAmount
+          //   },
+          //   {
+          //     name: "总客客单",
+          //     type: "bar",
+          //     stack: "总量",
+          //     label: {
+          //       normal: {
+          //         show: true
+          //       }
+          //     },
+          //     data: CountCustDan
+          //   },
+          //   {
+          //     name: "总客消费",
+          //     type: "bar",
+          //     stack: "总量",
+          //     label: {
+          //       normal: {
+          //         show: true
+          //       }
+          //     },
+          //     data: CounCustAmount,
+          //     markPoint: {
+          //       symbol: "pin", //标记类型
+          //       symbolSize: 60, //图形大小symbolSize:[50, 50],// 容器大小  symbolOffset:[0,-20],//位置偏移
+          //       itemStyle: {
+          //         normal: {
+          //           color: "black",
+          //           borderColor: "#fff",
+          //           borderWidth: 1, // 标注边线线宽，单位px，默认为1
+          //           label: {
+          //             show: true
+          //           }
+          //         }
+          //       },
+          //       data: data3
+          //     }
+          //   }
+          // ]
+        };
+
+        dataSourcePie.setOption(optionPie);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+  },
+  watch: {
+    startDate(val1, oldVal1) {
+      this.getList();
+    },
+    endDate(val2, oldVal2) {
+      this.getList();
+    },
+    sCity(val3, oldVal3) {
+      this.getList();
+    },
+    MDid(val4, oldVal4) {
+      this.getList();
+    },
+    choosedItemList(val5, oldVal5) {
+      this.getList();
+    },
+    date(val6, oldVal6) {
+      this.getList();
+    },
+    ItemId(val7, oldVal7) {
+      this.getList();
+    }
+  }
+};
+</script>
+<style>
+.a {
+  position: absolute;
+}
+</style>

@@ -1,0 +1,12 @@
+let time = new function () {
+    return {
+      options1: {
+        shortcuts: [{
+          text: "今天",
+          value() {
+            return new Date();
+          }
+        }]
+      }
+    }
+  }

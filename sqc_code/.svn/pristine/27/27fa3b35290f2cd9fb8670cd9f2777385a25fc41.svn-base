@@ -1,0 +1,115 @@
+<template>
+  <div>
+    <div class="QYjysh-container container">
+      <div class="search-box">
+        <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+          <row :gutter="20">
+            <i-col span="3">
+              <formItem prop="startDate">
+                <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+              </formItem>
+            </i-col>
+            <i-col span="3">
+              <formItem prop="endDate">
+                <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+              </formItem>
+            </i-col>
+            <i-col span="18">
+              <formItem class="btn-box">
+                <Button type="error" class="btn" @click="isshow=true">+对比</Button>
+                <Button type="primary" class="btn" @click="searchList">查询</Button>
+                <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+              </formItem>
+            </i-col>
+          </row>
+        </Form>
+      </div>
+    </div>
+
+    <div class="ceDiv" v-show="isshow">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" v-for="(index,i) in list" :key="i">
+
+        <formItem prop="startDate" style="width:120px">
+          <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期"  v-model="formItem.StartDate[index]" :clearable="false" :editable="false"></DatePicker>
+        </formItem>
+
+        <formItem prop="endDate" style="width:120px">
+          <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.EndDate[index]" :clearable="false" :editable="false"></DatePicker>
+        </formItem>
+
+        <button @click="tianjia(index)">添加</button>
+        <button @click="shanchu(index)">删除</button>
+
+      </Form>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echartsCommon from "@/api/Common.js";
+import echarts from "echarts";
+export default {
+  data() {
+    return {
+      items: [],
+      isshow: false,
+      list: [
+        {
+          id: 1,
+          name: 123
+        }
+      ],
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      timeList: echartsCommon.timeList(),
+      spinShow: true,
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        StartDate: new Date(),
+        EndDate: new Date(),
+        sCity: "",
+        sCityName: "",
+        time: ""
+      }
+    };
+  },
+  methods: {
+    tianjia(index) {
+      let that = this;
+      let a = {
+        id: "",
+        name: ""
+      };
+      that.list.push(a);
+      console.log(index);
+    },
+    shanchu(index) {
+      let that = this;
+      that.list.splice(index, 1);
+    },
+    searchList() {
+      let that = this;
+      that.isshow = false;
+    },
+    resetSearch() {}
+  }
+};
+</script>
+<style>
+.QYjysh-container .search-boxlll {
+  border-radius: 5px;
+  background: #fff;
+  padding: 10px 20px;
+}
+.ceDiv {
+  position: absolute;
+  right: 0px;
+  top: 45px;
+  z-index: 100;
+  width: 350px;
+  height: 500px;
+  border: 1px solid black;
+}
+</style>

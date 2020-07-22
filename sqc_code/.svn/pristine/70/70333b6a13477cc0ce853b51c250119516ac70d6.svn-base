@@ -1,0 +1,431 @@
+<template>
+  <div class="QYjysh-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3" v-show="QYisshow">
+            <FormItem prop="sCityName">
+              <Select v-model="formItem.sCityName" placeholder="区域" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3" v-show="MDisshow">
+            <FormItem prop="MDid">
+              <Select v-model="formItem.MDid" placeholder="门店" :filterable="true">
+                <Option v-for="item in CityList" :value="item.Name" :key="item.ID" @click.native="chooseMD(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <Select v-model="val" placeholder="对比条件" :filterable="true" @on-change='TJchange'>
+                <Option :value='0'>区域对比</Option>
+                <Option :value='1'>单店对比</Option>
+              </Select>
+            </formItem>
+          </i-col>
+          <i-col :span='span'>
+            <formItem class="btn-box">
+              <Button type="error" class="btn" @click="duibi">+对比</Button>
+              <Button type="primary" class="btn" @click="searchList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+
+    <div class="ZYJ_vue" v-show="isshow">
+      <div class="table-box" style="margin-top:0; margin-bottom:20px;">
+        <i-table stripe :columns="choosedItemColumns" :data="choosedItemList" :width="900"></i-table>
+      </div>
+    </div>
+
+  </div>
+
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    return {
+      span: 9,
+      val: "",
+      disabled: false,
+      display: "inline-block",
+      MDisshow: true,
+      QYisshow: true,
+      isshow: false,
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        sCity: "",
+        MDid: "",
+        sCityName: "",
+        time: ""
+      },
+      choosedItemColumns: [
+        {
+          title: "时间1",
+          align: "center",
+          key: "startDate",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("DatePicker", {
+                class: "DatePicker_time",
+                props: {
+                  options: that.options1,
+                  value: that.choosedItemList[params.index].startDate,
+                  "label-in-value": true
+                },
+                on: {
+                  "on-change": event => {
+                    params.row.startDate = event;
+                    that.choosedItemList[params.index].startDate = event;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "时间2",
+          align: "center",
+          key: "endDate",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("DatePicker", {
+                class: "DatePicker_time",
+                props: {
+                  options: that.options1,
+                  value: that.choosedItemList[params.index].endDate,
+                  "label-in-value": true
+                },
+                on: {
+                  "on-change": event => {
+                    params.row.endDate = event;
+                    that.choosedItemList[params.index].endDate = event;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "区域",
+          align: "center",
+          key: "sCity",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Select",
+                {
+                  props: {
+                    value: that.choosedItemList[params.index].sCity,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      params.row.sCity = event.value;
+                      that.choosedItemList[params.index].sCity = event.value;
+                    }
+                  }
+                },
+                that.storeList.map(function(type) {
+                  return h(
+                    "Option",
+                    {
+                      props: {
+                        value: type.ID
+                      }
+                    },
+                    type.Name
+                  );
+                })
+              )
+            ]);
+          }
+        },
+        {
+          title: "门店",
+          align: "center",
+          key: "storeID",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Select",
+                {
+                  props: {
+                    disabled: this.disabled,
+                    value: that.choosedItemList[params.index].storeID,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      params.row.storeID = event.value;
+                      that.choosedItemList[params.index].storeID = event.value;
+                    }
+                  }
+                  // style: {
+                  //   display: this.val == 0 ? "none" : "inline-block"
+                  // }
+                },
+                that.CityList.map(function(type) {
+                  return h(
+                    "Option",
+                    {
+                      props: {
+                        value: type.ID
+                      }
+                    },
+                    type.Name
+                  );
+                })
+              )
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          align: "center",
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-tianjia": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.addCharge(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "20px"
+                }
+              }),
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "5px"
+                }
+              })
+            ]);
+          }
+        }
+      ],
+      choosedItemList: [
+        // {
+        //   startDate: moment(new Date()).format("YYYY-MM-DD"),
+        //   startDate2: moment(new Date()).format("YYYY-MM-DD"),
+        //   sCity: 17,
+        //   storeID: ""
+        // }
+      ],
+      storeList: [],
+      CityList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    })
+  },
+  methods: {
+    choose(name, id) {
+      let that = this;
+      that.formItem.sCity = id;
+      that.getCity();
+    },
+    chooseMD(name, id) {
+      this.formItem.MDid = id;
+    },
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    duibi() {
+      let that = this;
+      that.isshow = true;
+      if (that.choosedItemList.length == 0) {
+        that.choosedItemList = [
+          {
+            employeeId: that.userMes.EmployeeID,
+            startDate: moment(new Date()).format("YYYY-MM-DD"),
+            endDate: moment(new Date()).format("YYYY-MM-DD"),
+            sCity: 17,
+            storeID: ""
+          }
+        ];
+      }
+    },
+    TJchange(val) {
+      let that = this;
+      that.val = val;
+      if (that.val == 1) {
+        //单店
+        that.QYisshow = true;
+        that.MDisshow = true;
+        that.disabled = false;
+        that.span = 9;
+      }
+      if (that.val == 0) {
+        //区域
+        that.MDisshow = false;
+        that.QYisshow = true;
+        that.disabled = true;
+        that.span = 12;
+        that.choosedItemList = [
+          {
+            employeeId: that.userMes.EmployeeID,
+            startDate: moment(new Date()).format("YYYY-MM-DD"),
+            endDate: moment(new Date()).format("YYYY-MM-DD"),
+            sCity: 17,
+            storeID: ""
+          }
+        ];
+      }
+      // console.log(that.val);
+    },
+    showDelDetailPoup(index) {
+      let that = this;
+      that.choosedItemList.splice(index, 1);
+    },
+    addCharge(index) {
+      let that = this;
+      let a = {
+        employeeId: that.userMes.EmployeeID,
+        startDate: moment(new Date()).format("YYYY-MM-DD"),
+        endDate: moment(new Date()).format("YYYY-MM-DD"),
+        sCity: 17,
+        storeID: ""
+      };
+      that.choosedItemList.push(a);
+    },
+    addForm() {
+      let that = this;
+      console.log(that.choosedItemList);
+    },
+    searchList() {
+      let that = this;
+      //判断两个时间段大小
+      echartsCommon.message = that.$Message;
+      if (
+        echartsCommon.ContrastTime(
+          that.formItem.startDate,
+          that.formItem.endDate
+          // that.formItem.StartDate1,
+          // that.formItem.EndDate1
+        )
+      ) {
+        that.getList();
+        that.addForm();
+        that.isshow = false;
+      }
+      //------------------
+    },
+    getList() {
+      let that = this;
+      let a = {
+        startDate: that.formItem.startDate,
+        endDate: that.formItem.endDate,
+        sCity: that.formItem.sCity,
+        storeId: "",
+        employeeId: that.userMes.EmployeeID
+      };
+      that.choosedItemList.push(a);
+      let data = {
+        ListModel: that.choosedItemList
+      };
+      api.getDemo(data).then(response => {
+        if (response.error_code === "Success") {
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.val = "";
+      that.getList();
+    },
+    // 获取区域列表
+    getStore() {
+      let that = this;
+      let data = {
+        employeeId: that.userMes.EmployeeID,
+        sCity: ""
+      };
+      api.NewGetAllCityInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.sCityName = that.storeList[0].Name;
+          that.formItem.sCity = that.storeList[0].ID;
+          that.getCity();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取有效门店
+    getCity() {
+      let that = this;
+      let data = {
+        sCity: that.formItem.sCity,
+        employeeId: that.userMes.EmployeeID
+      };
+      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.CityList = response.data.list;
+          // that.formItem.store = that.userMes.StoreName;
+          // that.formItem.storeID = that.userMes.StoreID;
+          // that.storeID = that.userMes.StoreID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getStore();
+    // that.getCity();
+  }
+};
+</script>
+<style scoped>
+.ZYJ_vue {
+  float: right;
+  /* margin-top: 100px; */
+}
+</style>

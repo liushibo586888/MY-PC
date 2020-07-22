@@ -1,0 +1,685 @@
+<template>
+  <div class="zfmx-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="StartDate">
+              <DatePicker type="month" class="DatePicker_time" placeholder="开始日期" :options="options1" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="EndDate">
+              <DatePicker type="month" class="DatePicker_time" placeholder="结束日期" :options="options1" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="Name">
+              <Input v-model="formItem.Key" placeholder="员工姓名"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <!-- <Option value="all" @click.native="choose()">所有</Option> -->
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="12">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+              <Button type="success" class="btn btn-search" @click="tianjia">添加</Button>
+              <Button type="error" class="btn btn-reset" @click="xiugai">修改</Button>
+              <Button type="success" class="btn btn-search" @click="ZDshenhe" v-show="isshow">审核</Button>
+              <Button type="success" class="btn btn-search" @click="Lookshenhe">审核过程</Button>
+
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-row-click="getRowID"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <!-- 修改弹窗 -->
+    <Modal :mask-closable="false" v-model="modal" width="500" class="dialog">
+      <div slot='close' class="close not-print">
+        <i class='ivu-icon ivu-icon-aaa-guanbi' @click="quXiao"></i>
+      </div>
+      <Form ref="formValidate1" :model="formValidate" :label-width="100" @submit.native.prevent class="form" style="margin-right:30px">
+
+        <FormItem prop="hlsName" label="护理师:">
+          <Input v-model="formValidate.hlsName" placeholder="填写护理师"></Input>
+          <!-- <Select v-model="formValidate.hlsName" placeholder="选择护理师" :filterable="true">
+            <Option v-for="item in hlsList" :value="item.Name" :key="item.ID" @click.native="chooseXGHLS(item.Name,item.ID)">{{ item.Name }}</Option>
+          </Select> -->
+        </FormItem>
+
+        <FormItem prop="Year" label="年份:">
+          <Input v-model="formValidate.Year" placeholder="无"></Input>
+        </FormItem>
+
+        <FormItem prop="Month" label="月份:">
+          <Input v-model="formValidate.Month" placeholder="无"></Input>
+        </FormItem>
+
+        <FormItem prop="EarlyGoal" label="业绩目标:">
+          <Input v-model="formValidate.EarlyGoal" placeholder="无"></Input>
+        </FormItem>
+
+      </Form>
+      <div slot="footer" class="footer not-print">
+        <Button class="btn" type="primary" @click="baoCun" :loading="onLoading">保存</Button>
+        <Button class="btn" type="warning" @click="quXiao" :loading="onLoading">取消</Button>
+      </div>
+    </Modal>
+
+    <!-- 添加弹窗 -->
+    <Modal :mask-closable="false" v-model="modal1" width="500" class="dialog">
+      <div slot='close' class="close not-print">
+        <i class='ivu-icon ivu-icon-aaa-guanbi' @click="quXiaoTJ"></i>
+      </div>
+      <Form ref="formValidateTJ" :model="formValidateTJ" :label-width="100" @submit.native.prevent class="form" style="margin-right:30px">
+        <FormItem prop="hlsName" label="护理师:">
+          <Input v-model="formValidateTJ.hlsName" placeholder="填写护理师"></Input>
+          <!-- <Select v-model="formValidateTJ.hlsName" placeholder="选择护理师" :filterable="true">
+            <Option v-for="item in hlsList" :value="item.Name" :key="item.ID" @click.native="chooseTJHLS(item.Name,item.ID)">{{ item.Name }}</Option>
+          </Select> -->
+        </FormItem>
+
+        <FormItem prop="Year" label="年份:">
+          <Input v-model="formValidateTJ.Year" placeholder="无"></Input>
+        </FormItem>
+
+        <FormItem prop="Month" label="月份:">
+          <Input v-model="formValidateTJ.Month" placeholder="无"></Input>
+        </FormItem>
+
+        <FormItem prop="EarlyGoal" label="业绩目标:">
+          <Input v-model="formValidateTJ.EarlyGoal" placeholder="无"></Input>
+        </FormItem>
+
+      </Form>
+      <div slot="footer" class="footer not-print">
+        <Button class="btn" type="primary" @click="baoCunTJ" :loading="onLoading">保存</Button>
+        <Button class="btn" type="warning" @click="quXiaoTJ" :loading="onLoading">取消</Button>
+      </div>
+    </Modal>
+
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+      <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+        <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+      </Select>
+
+      <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+      <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+      <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+      <div class="page-box">
+        <p>前往</p>
+        <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+        <p>页</p>
+      </div>
+    </div>
+    <!-- 审核弹窗 -->
+    <Modal :mask-closable="false" v-model="modalSH">
+      <div slot='close' class="close not-print">
+        <i class='ivu-icon ivu-icon-aaa-guanbi' @click='cancel'></i>
+      </div>
+      <div>
+        审核意见：
+        <Input type="textarea" v-model="SHjianyi" placeholder="审核意见" autofocus style="width: 100%" />
+      </div>
+
+      <div slot="footer" class="footer not-print">
+        <Button class="btn" type="primary" @click="ok" :loading="onLoading">确定</Button>
+        <Button class="btn" type="warning" @click="cancel" :loading="onLoading">取消</Button>
+      </div>
+    </Modal>
+    <!-- 查看审核过程弹窗 -->
+    <Modal v-model="modalCKSH" width="650">
+      <div style="marginTop:20px">
+        <Table :columns="columns2" :data="guoChenlist"></Table>
+        <!-- <tableLoadingPage :loading="tableLoading"></tableLoadingPage> -->
+      </div>
+
+    </Modal>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import btnQX from "@/api/btnQX.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      isshow: false,
+      modalSH: false,
+      modalCKSH: false,
+      SHjianyi: "",
+      onLoading: false,
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      modal: false, //修改
+      modal1: false, //添加
+      tableHeight: 40,
+      rowID: "",
+      Status: "",
+      formValidate: {
+        ID:"",
+        hlsName: "",
+        StoreId: "",
+        StoreName: "",
+        Year: "",
+        Month: "",
+        EarlyGoal: ""
+      },
+      formValidateTJ: {
+        hlsName: "",
+        StoreId: "",
+        StoreName: "",
+        Year: "",
+        Month: "",
+        EarlyGoal: ""
+      },
+      formItem: {
+        StartDate: new Date(),
+        EndDate: new Date(),
+        StoreID: null,
+        EmployeeID: "",
+        Key: "",
+        store: "all",
+        page: "",
+        size: ""
+      },
+      columns1: [
+        {
+          title: "员工姓名",
+          key: "EmployeeName",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "年份",
+          key: "Year",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "月份",
+          key: "Month",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "业绩目标",
+          key: "Performance",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "状态",
+          key: "Status",
+          align: "center",
+          width: 250
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      columns2: [
+        {
+          title: "审核人",
+          key: "ReviewerName",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "状态",
+          key: "Status",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "审核时间",
+          key: "CreateDate",
+          align: "center",
+          width: 100,
+          render: (h, params) => {
+            if (!params.row.CreateDate) {
+              return h("div", {}, "");
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.CreateDate).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: "意见",
+          key: "Remark",
+          align: "center",
+          width: 200
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      storeList: [],
+      hlsList: [],
+      guoChenlist: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    tianjia() {
+      let that = this;
+      that.modal1 = true;
+    },
+    baoCunTJ() {
+      let that = this;
+      that.onLoading = true;
+      let data = {
+        EmployeeId: that.userMes.EmployeeID,
+        NursingPerformanceTarget: {}
+      };
+      data.NursingPerformanceTarget = {
+        // Id: that.formValidateTJ.hlsName,
+        StoreId: that.formItem.StoreID,
+        Year: that.formValidateTJ.Year,
+        Month: that.formValidateTJ.Month,
+        EmployeeId: that.userMes.EmployeeID,
+        Performance: that.formValidateTJ.EarlyGoal
+      };
+      api.NursingPerformanceTargetAdd(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("添加成功");
+          that.getList();
+          that.onLoading = false;
+          that.quXiaoTJ();
+        } else {
+          that.$Message.error(response.error_message);
+          that.onLoading = false;
+          //   that.quXiaoTJ();
+        }
+      });
+    },
+    quXiaoTJ() {
+      let that = this;
+      that.$refs.formValidateTJ.resetFields();
+      that.modal1 = false;
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.Id;
+      that.Status = row.Status;
+    },
+    xiugai() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条数据");
+      } else {
+        that.modal = true;
+        let data = {
+          Id: that.rowID
+        };
+        api.NursingPerformanceTargetgetModel(data).then(response => {
+          if (response.error_code === "Success") {
+            that.setData(response.data);
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.ID=res.Id;
+      that.formValidate.hlsName = res.EmployeeName;
+      that.formValidate.Year = res.Year;
+      that.formValidate.Month = res.Month;
+      that.formValidate.EarlyGoal = res.Performance;
+    },
+    shenhe() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条数据");
+      } else {
+        that.modal = true;
+        let data = {
+          Id: that.rowID
+        };
+        api.NursingPerformanceTargetgetModel(data).then(response => {
+          if (response.error_code === "Success") {
+            that.setData(response.data);
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }
+    },
+    ZDshenhe() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条数据");
+      } else {
+        that.modalSH = true;
+      }
+    },
+    ok() {
+      let that = this;
+      let data = {
+        EmployeeId: that.userMes.EmployeeID,
+        Remark: that.SHjianyi,
+        NursingPerformanceTarget: {}
+      };
+      if (that.Status == "待审核") {
+        that.Status = 1;
+      }
+      if (that.Status == "门店经理审核通过") {
+        that.Status = 2;
+      }
+      if (that.Status == "门店经理审核不通过") {
+        that.Status = 3;
+      }
+      if (that.Status == "区域经理审核通过") {
+        that.Status = 4;
+      }
+      if (that.Status == "等区域经理审核不通过") {
+        that.Status = 5;
+      }
+      data.NursingPerformanceTarget = {
+        Id: that.rowID,
+        Status: that.Status
+      };
+      api.NursingPerformanceTargetAuditStep1(data).then(response => {
+        if (response.error_code === "Success") {
+          that.modalSH = false;
+          that.SHjianyi = "";
+          that.getList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    cancel() {
+      let that = this;
+      that.modalSH = false;
+      that.SHjianyi = "";
+    },
+    Lookshenhe() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条数据");
+      } else {
+        that.modalCKSH = true;
+        let data = {
+          id: that.rowID
+        };
+        api.NursingPerformanceTargetAuditgetAuditList(data).then(response => {
+          if (response.error_code === "Success") {
+            let res = response.data;
+            that.guoChenlist = res;
+            for (let i = 0; i < res.length; i++) {
+              if (res[i].Status == 1) {
+                res[i].Status = "待审核";
+              }
+              if (res[i].Status == 2) {
+                res[i].Status = "门店经理审核通过";
+              }
+              if (res[i].Status == 3) {
+                res[i].Status = "门店经理审核不通过";
+              }
+              if (res[i].Status == 4) {
+                res[i].Status = "区域经理审核通过";
+              }
+              if (res[i].Status == 5) {
+                res[i].Status = "等区域经理审核不通过";
+              }
+            }
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      // 两者同时存在
+      if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+        that.$Message.error("开始日期不得大于结束日期");
+        return false;
+      }
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    quXiao() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal = false;
+    },
+    baoCun() {
+      let that = this;
+      that.onLoading = true;
+      let data = {
+        EmployeeId: that.userMes.EmployeeID,
+        NursingPerformanceTarget: {}
+      };
+      data.NursingPerformanceTarget = {
+        Id: that.formValidate.ID,
+        StoreId: that.formItem.StoreID,
+        Year: that.formValidate.Year,
+        Month: that.formValidate.Month,
+        EmployeeId: that.userMes.EmployeeID,
+        Performance: that.formValidate.EarlyGoal
+      };
+      api.NursingPerformanceTargetEdit(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.getList();
+          that.rowID = "";
+          that.onLoading = false;
+          that.quXiao();
+        } else {
+          that.$Message.error(response.error_message);
+          that.onLoading = false;
+          //   that.quXiao();
+        }
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let userMessage = JSON.parse(localStorage.userMessage);
+        that.formItem.EmployeeID = userMessage.EmployeeID;
+        that.formItem.page = that.tablePage.page;
+        that.formItem.size = that.tablePage.pageNum;
+        let data = {
+          EmployeeId: userMessage.EmployeeID,
+          StoreId: that.formItem.StoreID,
+          StartDate: that.formItem.StartDate,
+          EndDate: that.formItem.EndDate,
+          Key: that.formItem.Key
+          //   PageIndex: that.formItem.page,
+          //   PageSize: that.formItem.size
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM");
+          that.formItem.StartDate = data.StartDate;
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM");
+          that.formItem.EndDate = data.EndDate;
+        }
+        that.tableLoading = true;
+        api.NursingPerformanceTarget(data).then(response => {
+          if (response.error_code === "Success") {
+            let res = response.data.Result.list;
+            for (let i = 0; i < res.length; i++) {
+              if (res[i].Status == 1) {
+                res[i].Status = "待审核";
+              }
+              if (res[i].Status == 2) {
+                res[i].Status = "门店经理审核通过";
+              }
+              if (res[i].Status == 3) {
+                res[i].Status = "门店经理审核不通过";
+              }
+              if (res[i].Status == 4) {
+                res[i].Status = "区域经理审核通过";
+              }
+              if (res[i].Status == 5) {
+                res[i].Status = "等区域经理审核不通过";
+              }
+            }
+            that.list = res;
+            that.hlsList = response.data.Model;
+            that.tableLoading = false;
+            that.page = res.page;
+            that.tablePage.allNum = res.total;
+            that.tablePage.maxPageNum = res.totalPage;
+            that.setPage();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+        //下面的代码不需要，不然会造成导出数据只有10条   (张奕伦 20181111)
+        // ,
+        // columns: that.columns1.filter((col, index) => index < (that.columns1.length - 1)),
+        // data: that.list.filter((data, index) => index < (that.columns1.length - 1))
+      });
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let arr = [];
+      api.getValidStores().then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.store = that.userMes.StoreName;
+          that.formItem.StoreID = that.userMes.StoreID;
+          that.formValidateTJ.hlsName=that.userMes.EmployeeName;
+          console.log(that.userMes.EmployeeName);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    choose(name, id) {
+      //   if (name === undefined && id === undefined) {
+      //     this.formItem.store = "所有";
+      //     this.formItem.StoreID = null;
+      //   } else {
+      this.formItem.store = name;
+      this.formItem.StoreID = id;
+      //   }
+    },
+    chooseXGHLS(name, id) {
+      this.formValidate.hlsName = id;
+    },
+    chooseTJHLS(name, id) {
+      this.formValidateTJ.hlsName = id;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.getStore();
+      that.isshow = btnQX.apiUrlList("btnshneheapi");
+    });
+  }
+};
+</script>
+<style>
+</style>
+

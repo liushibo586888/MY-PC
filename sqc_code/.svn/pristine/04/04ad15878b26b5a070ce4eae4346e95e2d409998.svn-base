@@ -1,0 +1,599 @@
+<template>
+  <div class="QYjysh-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3" v-show="QYisshow">
+            <FormItem prop="sCityName">
+              <Select v-model="formItem.sCityName" placeholder="区域" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3" v-show="MDisshow">
+            <FormItem prop="MDid">
+              <Select v-model="formItem.MDName" placeholder="门店" :filterable="true" :rule='formItemRule.MDid'>
+                <Option v-for="item in CityList" :value="item.Name" :key="item.ID" @click.native="chooseMD(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <Select v-model="val" placeholder="对比条件" :filterable="true" @on-change='TJchange'>
+                <Option :value='1'>区域所有门店</Option>
+                <Option :value='2'>区域对比</Option>
+                <Option :value='3'>单店对比</Option>
+              </Select>
+            </formItem>
+          </i-col>
+          <i-col :span='span'>
+            <formItem class="btn-box">
+              <Button type="error" class="btn" @click="duibi" :disabled='this.val==1?true:false'>+对比</Button>
+              <Button type="primary" class="btn" @click="searchList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+
+    <div class="ZYJ_vue" v-show="isshow">
+      <div class="table-box" style="margin-top:0; margin-bottom:200px;">
+        <i-table stripe :columns="choosedItemColumns" :data="choosedItemList" :width="900" :height='470'></i-table>
+      </div>
+    </div>
+
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          总业绩排名
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    // props: ["startDate", "endDate", "sCity", "MDid"];
+    return {
+      spinShow: true,
+      span: 12,
+      val: 1,
+      disabled: true,
+      display: "inline-block",
+      MDisshow: false,
+      QYisshow: true,
+      isshow: false,
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        sCity: "",
+        sCityName: "",
+        MDid: "",
+        MDName: "",
+        time: ""
+      },
+      formItemRule: {
+        MDid: {
+          required: true,
+          message: "店名不得为空",
+          trigger: "blur"
+        }
+      },
+      choosedItemColumns: [
+        {
+          title: "开始时间",
+          align: "center",
+          key: "startDate",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("DatePicker", {
+                class: "DatePicker_time",
+                props: {
+                  clearable: false,
+                  editable: false,
+                  options: that.options1,
+                  value: that.choosedItemList[params.index].startDate,
+                  "label-in-value": true
+                },
+                on: {
+                  "on-change": event => {
+                    params.row.startDate = event;
+                    that.choosedItemList[params.index].startDate = event;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "结束时间",
+          align: "center",
+          key: "endDate",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("DatePicker", {
+                class: "DatePicker_time",
+                props: {
+                  clearable: false,
+                  editable: false,
+                  options: that.options1,
+                  value: that.choosedItemList[params.index].endDate,
+                  "label-in-value": true
+                },
+                on: {
+                  "on-change": event => {
+                    params.row.endDate = event;
+                    that.choosedItemList[params.index].endDate = event;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "区域",
+          align: "center",
+          key: "areaID",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Select",
+                {
+                  props: {
+                    value: that.choosedItemList[params.index].areaID,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      params.row.areaID = event.value;
+                      that.choosedItemList[params.index].areaID = event.value;
+                      let data = {
+                        sCity: params.row.areaID,
+                        employeeId: that.userMes.EmployeeID
+                      };
+                      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+                        if (response.error_code === "Success") {
+                          that.choosedItemList[params.index].arr =
+                            response.data.list;
+                          if (this.val == 3) {
+                            that.choosedItemList[params.index].storeID =
+                              that.choosedItemList[params.index].arr[0].ID;
+                          } else {
+                            that.choosedItemList[params.index].storeID = "";
+                          }
+                        } else {
+                          that.$Message.error(response.error_message);
+                        }
+                      });
+                    }
+                  }
+                },
+                that.storeList.map(function(type) {
+                  return h(
+                    "Option",
+                    {
+                      props: {
+                        value: type.ID
+                      }
+                    },
+                    type.Name
+                  );
+                })
+              )
+            ]);
+          }
+        },
+        {
+          title: "门店",
+          align: "center",
+          key: "storeID",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Select",
+                {
+                  props: {
+                    disabled: this.disabled,
+                    value: that.choosedItemList[params.index].storeID,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      params.row.storeID = event.value;
+                      that.choosedItemList[params.index].storeID = event.value;
+                    }
+                  }
+                  // style: {
+                  //   display: this.val == 0 ? "none" : "inline-block"
+                  // }
+                },
+                that.choosedItemList[params.index].arr.map(function(type) {
+                  return h(
+                    "Option",
+                    {
+                      props: {
+                        value: type.ID
+                      }
+                    },
+                    type.Name
+                  );
+                })
+              )
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          align: "center",
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-tianjia": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.addCharge(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "20px"
+                }
+              }),
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "5px"
+                }
+              })
+            ]);
+          }
+        }
+      ],
+      choosedItemList: [
+        // {
+        //   startDate: moment(new Date()).format("YYYY-MM-DD"),
+        //   startDate2: moment(new Date()).format("YYYY-MM-DD"),
+        //   sCity: 17,
+        //   storeID: ""
+        // }
+      ],
+      storeList: [],
+      CityList: [],
+      CityList1: [],
+      list: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    })
+  },
+  methods: {
+    choose(name, id) {
+      let that = this;
+      that.formItem.sCity = id;
+      that.getCity();
+    },
+    chooseMD(name, id) {
+      let that = this;
+      that.formItem.MDid = id;
+    },
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    duibi() {
+      let that = this;
+      that.isshow = true;
+      if (that.choosedItemList.length == 0 && that.val == 3) {
+        that.choosedItemList = [
+          {
+            startDate: moment(new Date()).format("YYYY-MM-DD"),
+            endDate: moment(new Date()).format("YYYY-MM-DD"),
+            areaID: "17",
+            storeID: "00001",
+            arr: that.CityList1
+          }
+        ];
+      }
+      if (that.choosedItemList.length == 0 && that.val == 2) {
+        that.choosedItemList = [
+          {
+            startDate: moment(new Date()).format("YYYY-MM-DD"),
+            endDate: moment(new Date()).format("YYYY-MM-DD"),
+            areaID: "17",
+            storeID: "",
+            arr: that.CityList1
+          }
+        ];
+      }
+    },
+    TJchange(val) {
+      let that = this;
+      that.val = val;
+      if (that.val == 1) {
+        that.MDisshow = false;
+        that.span = 12;
+        that.formItem.MDid = "";
+        that.choosedItemList = [];
+      }
+      if (that.val == 3) {
+        //单店
+        that.QYisshow = true;
+        that.MDisshow = true;
+        that.disabled = false;
+        that.span = 9;
+        that.formItem.MDid = that.CityList[0].ID;
+        that.choosedItemList = [];
+      }
+      if (that.val == 2) {
+        //区域
+        that.MDisshow = false;
+        that.QYisshow = true;
+        that.disabled = true;
+        that.span = 12;
+        that.formItem.MDid = "";
+        that.choosedItemList = [];
+      }
+    },
+    showDelDetailPoup(index) {
+      let that = this;
+      that.choosedItemList.splice(index, 1);
+    },
+    addCharge(index) {
+      let that = this;
+      let a = {
+        startDate: moment(new Date()).format("YYYY-MM-DD"),
+        endDate: moment(new Date()).format("YYYY-MM-DD"),
+        areaID: "17",
+        storeID: "",
+        arr: that.CityList1
+      };
+      let a1 = {
+        startDate: moment(new Date()).format("YYYY-MM-DD"),
+        endDate: moment(new Date()).format("YYYY-MM-DD"),
+        areaID: "17",
+        storeID: "00001",
+        arr: that.CityList1
+      };
+      if (that.val == 2) {
+        that.choosedItemList.push(a);
+      } else {
+        that.choosedItemList.push(a1);
+      }
+    },
+    addForm() {
+      let that = this;
+      // console.log(that.choosedItemList);
+    },
+    searchList() {
+      let that = this;
+      //判断两个时间段大小
+      echartsCommon.message = that.$Message;
+      if (
+        echartsCommon.ContrastTime(
+          that.formItem.startDate,
+          that.formItem.endDate
+          // that.formItem.StartDate1,
+          // that.formItem.EndDate1
+        )
+      ) {
+        that.getList();
+        that.addForm();
+        that.isshow = false;
+      }
+      //------------------
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        // that.$refs.searchForm.resetFields();
+        let data = {
+          reportType: that.val,
+          startDate: that.formItem.startDate,
+          endDate: that.formItem.endDate,
+          areaID: that.formItem.sCity,
+          storeId: that.formItem.MDid,
+          employeeId: that.userMes.EmployeeID,
+          ListModel: that.choosedItemList
+        };
+        data.startDate = moment(that.formItem.startDate).format("YYYY-MM-DD");
+        data.endDate = moment(that.formItem.endDate).format("YYYY-MM-DD");
+        let temp = JSON.parse(JSON.stringify(data));
+        temp.ListModel.forEach(x => delete x.arr);
+        that.spinShow = true;
+        api.GetStoreTimeAmount(temp).then(response => {
+          if (response.error_code === "Success") {
+            that.list = response.data.list;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 300);
+    },
+    setPieData() {
+      let that = this;
+      let pieData = [];
+      let barName = [];
+      for (let i in that.list) {
+        let a = {
+          value: that.list[i].CustNum1,
+          Name: that.list[i].Name
+        };
+        pieData.push(a.value);
+        barName.push(a.Name);
+      }
+      that.setEcharts(pieData, barName);
+    },
+    setEcharts(pieData, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: ["#3398DB"],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              // 坐标轴指示器，坐标轴触发有效
+              type: "shadow" // 默认为直线，可选为：'line' | 'shadow'
+            }
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            containLabel: true
+          },
+          xAxis: [
+            {
+              type: "category",
+              data: barName,
+              axisLabel: echartsCommon.axisLabel(),
+              axisTick: {
+                alignWithLabel: true
+              }
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+            }
+          ],
+          series: [
+            {
+              name: "直接访问",
+              type: "bar",
+              barWidth: "60%",
+              data: pieData,
+              itemStyle: echartsCommon.itemStyle(10)
+            }
+          ]
+        };
+        var opt = optionPie.series;
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.val = "";
+      that.getList();
+    },
+    // 获取区域列表
+    getStore() {
+      let that = this;
+      let data = {
+        employeeId: that.userMes.EmployeeID,
+        sCity: ""
+      };
+      api.NewGetAllCityInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.sCityName = that.storeList[0].Name;
+          that.formItem.sCity = that.storeList[0].ID;
+          that.getCity();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取有效门店
+    getCity() {
+      let that = this;
+      let data = {
+        sCity: that.formItem.sCity,
+        employeeId: that.userMes.EmployeeID
+      };
+      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.CityList = response.data.list;
+          if (that.val == 3) {
+            that.formItem.MDid = that.CityList[0].ID;
+          } else {
+            that.formItem.MDid = "";
+          }
+          that.formItem.MDName = that.CityList[0].Name;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getCity1() {
+      let that = this;
+      let data = {
+        sCity: "17",
+        employeeId: that.userMes.EmployeeID
+      };
+      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.CityList1 = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getStore();
+    that.getCity1();
+    that.getList();
+  }
+};
+</script>
+<style scoped>
+.ZYJ_vue {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  margin-bottom: 200px;
+  /* margin-top: 100px; */
+}
+</style>

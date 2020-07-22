@@ -1,0 +1,39 @@
+{
+    "error_code": "Success",
+    "error_message": null,
+    "data": {
+        "page": 1,
+        "size": 10,
+        "total": 8,
+        "totalPage": 1,
+        "list": [{
+                "ID": 1,
+                "CusNum": "000001",
+                "CusName": "宜昌市蓝霸光电节能科技有限公司",
+                "Phone": "17730223770",
+                "Email": "652634043@qq.com",
+                "Fax": "",
+                "Address": "安徽省亳州市",
+                "CusType": 0,
+                "IsDelete": 0,
+                "CreateTime": "2016-02-10T11:24:13.54",
+                "CreateUser": null,
+                "Remark": "哈哈哈哈哈哈"
+            },
+            {
+                "ID": 2,
+                "CusNum": "000002",
+                "CusName": "宜昌市彼岸软件有限责任公司",
+                "Phone": "18856889889",
+                "Email": "569874123@qq.com",
+                "Fax": "",
+                "Address": "安徽省河南省",
+                "CusType": 0,
+                "IsDelete": 0,
+                "CreateTime": "2016-02-10T11:24:58.247",
+                "CreateUser": null,
+                "Remark": "你是我的小苹果"
+            }
+        ]
+    }
+}

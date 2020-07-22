@@ -1,0 +1,446 @@
+<template>
+    <div class="qdxd-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="DepartmentName">
+                            <Input v-model="formItem.DepartmentName" placeholder="部门名称"></Input>
+                        </formItem>
+                    </i-col>
+                     <i-col span="3">
+                        <formItem prop="StoreName">
+                            <Input v-model="formItem.StoreName" placeholder="门店名称"></Input>
+                        </formItem>
+                    </i-col>
+                    <i-col span="18">
+                        <formItem class="btn-box">
+                            <i-button type="primary" class="btn btn-search" @click="searchList">搜索</i-button>
+                            <i-button type="warning" class="btn btn-reset" @click="resetSearch">重置</i-button>
+                            <i-button type="primary" class="btn btn-add" @click="addHour" v-if="setAuthor">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="editHour" v-if="setAuthorEdit" :disabled="!rowID">修改</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="getDetail"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+        <!-- 弹窗 -->
+        <Modal :mask-closable="false"  v-model="modal1" class="dialog" :width="500" v-if="setAuthor || setAuthorEdit">
+            <div slot='header' class="header">
+              {{setModalTitle}}
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="100" @submit.native.prevent class="form" >
+                <FormItem prop="ShiftsID" label="选择班次：" :rules="formValidateRule.ShiftsID">
+                  <Select v-model="formValidate.ShiftsID">
+                  <!-- <Select v-model="formValidate.ShiftsID" :filterable="true" @on-open-change="getScheduling()"> -->
+
+                        <Option v-for="item in shiftsList" :value="item.ID" :key="item.ID">{{ item.Name }}</Option>
+                    </Select>
+                </FormItem>
+                <FormItem prop="StartTime" label="上班时间：" :rules="formValidateRule.StartTime">
+                  <Time-picker type="time" placeholder="请输入" style="width:100%" v-model="formValidate.StartTime"></Time-picker>
+                </FormItem>
+                <FormItem prop="EndTime" label="下班时间：" :rules="formValidateRule.EndTime">
+                  <Time-picker type="time" placeholder="请输入" style="width:100%" v-model="formValidate.EndTime"></Time-picker>
+                </FormItem>
+                <FormItem prop="Valid" label="是否有效：" :rules="formValidateRule.Valid">
+                  <Select v-model="formValidate.Valid">
+                    <Option :value="1">是</Option>
+                    <Option :value="0">否</Option>
+                  </Select>
+                </FormItem>
+            </Form>
+            <div slot="footer" class="footer">
+                <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+                <Button type="warning" class="btn" @click="resetForm" :loading="loading">取消</Button>
+            </div>
+        </Modal>
+    </div>
+</template>
+<script>
+import api from '@/api/index.js'
+import storejs from 'storejs'
+import { mapState } from 'vuex'
+import moment from "moment"
+export default {
+  data() {
+    const validateTel = (rule, value, callback) => {
+      let reg = /^1\d{10}$/
+      if (value === '') {
+        callback(new Error('手机号不得为空'));
+      } else if (!reg.test(value)) {
+        callback(new Error('请输入正确的手机号'));
+      } else {
+        callback()
+      }
+    }
+    return {
+      rowID: '',
+      mode: 1,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableLoading: false,
+      loading: false,
+      tableHeight: 40,
+      modal1: false,
+      formValidate: {
+        StartTime: '',
+        EndTime: '',
+        ShiftsID: '',
+        Valid: 1
+      },
+      formValidateRule: {
+        ShiftsID: { required: true, message: '班次不得为空', trigger: 'blur', type: 'number' },
+        StartTime: { required: true, message: '上班时间不得为空', trigger: 'blur', type: 'date' },
+        EndTime: { required: true, message: '下班时间不得为空', trigger: 'blur', type: 'date' },
+        Valid: { required: true, message: '有效值不得为空', trigger: 'blur', type: 'number' }
+      },
+      formItem: {
+        DepartmentName: '',
+        StoreName: ''
+      },
+      columns1: [
+        {
+          title: '创建日期',
+          key: 'CreateDate',
+          align: 'center',
+          render: (h, params) => {
+            if (!params.row.CreateDate) {
+              return h('div', {}, '')
+            }
+            return h('div', {}, moment(params.row.CreateDate).format('YYYY-MM-DD'))
+          }
+        }, {
+          title: '门店名称',
+          key: 'StoreName',
+          align: 'center'
+        }, {
+          title: '部门名称',
+          key: 'DepartmentName',
+          align: 'center'
+        }, {
+          title: '上班时间',
+          key: 'StartTime',
+          align: 'center'
+        }, {
+          title: '下班时间',
+          key: 'EndTime',
+          align: 'center'
+        }, {
+          title: '班次名称',
+          key: 'ShiftsName',
+          align: 'center'
+        }, {
+          title: '是否有效',
+          key: 'Valid',
+          width: 140,
+          align: 'center',
+          render: (h, params) => {
+            let text = params.row.Valid ? '是' : '否'
+            return h('div', {}, text)
+          }
+        }, {
+          width: 10,
+          title: ' '
+        }
+      ],
+      list: [],
+      shiftsList: []
+    }
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this
+      return that.tableHeight
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this
+      let pageName = that.$route.name
+      let list = that.authorList[pageName]
+      if (list) {
+        for (let i of list) {
+          if (i.Name === '增加') {
+            return i.IsVisible
+            break
+          }
+        }
+      } else {
+        return false
+      }
+    },
+    setAuthorEdit() {
+      // 判断用户是否有查看客户详情权限
+      let that = this
+      let pageName = that.$route.name
+      let list = that.authorList[pageName]
+      if (list) {
+        for (let i of list) {
+          if (i.Name === '修改') {
+            return i.IsVisible
+            break
+          }
+        }
+      } else {
+        return false
+      }
+    },
+    setModalTitle() {
+      let that = this
+      let mode = that.mode
+      let title = mode == 1 ? '新增' : '编辑'
+      return title
+    }
+  },
+  methods: {
+    searchList() {
+      let that = this
+      that.tablePage.page = 1
+      that.getList()
+    },
+    getDetail(row) {
+      let that = this
+      that.rowID = row.ID
+    },
+    // 获取排班表
+    getScheduling() {
+      let data = {}
+      api.getShift(data).then((response) => {
+        if (response.error_code === 'Success') {
+          this.shiftsList = response.data.list
+        } else {
+          this.$Message.error(response.error_message)
+        }
+      })
+    },
+    addHour() {
+      // 显示新增弹窗
+      let that = this
+      that.resetForm()
+      that.modal1 = true
+      that.mode = 1
+    },
+    editHour() {
+      let that = this
+      if (!that.rowID) {
+        that.$Message.error('请选择一条订单')
+        return false
+      }
+      that.$store.commit('changeLoadingPage')
+      api.getCustomTime(that.rowID).then((response) => {
+        that.$store.commit('changeLoadingPage')
+        if (response.error_code === 'Success') {
+          that.resetForm()
+          let res = response.data
+          that.formValidate.ID = res.ID
+          that.formValidate.ShiftsID = res.ShiftsID
+          that.formValidate.EndTime = res.EndTime
+          that.formValidate.StartTime = res.StartTime
+          that.formValidate.StartTime = res.StartTime
+          that.formValidate.Valid = res.Valid ? 1 : 0
+          that.mode = 2
+          that.modal1 = true
+        } else {
+          that.$Message.error(response.error_message)
+          return false
+        }
+      })
+    },
+    resetSearch() {
+      let that = this
+      that.$refs.searchForm.resetFields()
+      that.tablePage.page = 1
+      that.getList()
+    },
+    resetForm() {
+      let that = this
+      that.formValidate.ID = ''
+      that.$refs.formValidate1.resetFields()
+      that.modal1 = false
+    },
+    addForm() {
+      console.log("tt");
+      // 新增
+      let that = this
+      that.$refs.formValidate1.validate((validate) => {
+        if (validate) {
+          let data = {
+            Valid: that.formValidate.Valid === 0 ? false : true,
+            CreateBy: that.userMes.EmployeeID,
+            StartTime: that.formValidate.StartTime,
+            EndTime: that.formValidate.EndTime,
+            ShiftsID: that.formValidate.ShiftsID
+          }
+          
+          data.StartTime = moment(data.StartTime).format('HH:mm:ss');
+          data.EndTime = moment(data.EndTime).format('HH:mm:ss');
+
+          // data.StartTime = data.StartTime.substr(0, data.StartTime.length - 3) + ':00'
+          // data.EndTime = data.EndTime.substr(0, data.EndTime.length - 3) + ':00'
+
+
+          if (that.formValidate.ID) {
+            console.log("bb");
+            that.modefyMessage(data)
+            return false
+          }
+
+          api.customTime(data).then((response) => {
+            that.loading = false
+            if (response.error_code === 'Success') {
+              that.$refs.formValidate1.resetFields()
+              that.getList()
+              that.modal1 = false
+              that.$Message.success('添加成功')
+            } else {
+              this.$Message.error(response.error_message)
+            }
+          })
+        } else {
+          this.$Message.error('有必填项为空')
+        }
+      })
+    },
+    modefyMessage(data) {
+      console.log("test");
+      let that = this
+      api.modefyShifts(that.formValidate.ID, data).then((response) => {
+        if (response.error_code === 'Success') {
+          that.$Message.success('编辑成功')
+          that.getList()
+          that.resetForm()
+        } else {
+          that.$Message.error(response.error_message)
+        }
+      })
+    },
+    setData(res) {
+      let that = this
+      that.formValidate.CustomerName = res.Name
+      that.formValidate.CustomerAge = res.Age ? res.Age : '无'
+      that.formValidate.CustomerPhone = res.Phone ? res.Phone : '无'
+      that.formValidate.CustomerSex = res.Sex ? res.Sex : '无'
+      that.formValidate.ReserveStoreID = res.StoreID ? res.StoreID : '无'
+    },
+    initTableHeight() {
+      let that = this
+      that.tableHeight = document.getElementById('tableBox').offsetHeight
+      window.onresize = function () {
+        that.tableHeight = document.getElementById('tableBox').offsetHeight
+      }
+    },
+    setPage() {
+      let that = this
+      let teblePage = that.tablePage
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1
+      let endPage = teblePage.page * teblePage.pageNum
+      teblePage.endNum = endPage > teblePage.allNum ? teblePage.allNum : endPage
+    },
+    prevPage() {
+      let that = this
+      if (that.tablePage.page <= 1) {
+        that.$Message.error('已经是第一页')
+        return false
+      }
+      that.tablePage.page--
+      that.getList()
+    },
+    nextPage() {
+      let that = this
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error('已经是最后一页')
+        return false
+      }
+      that.tablePage.page++
+      that.getList()
+    },
+    changePage() {
+      let that = this
+      that.getList()
+    },
+    getList() {
+      let that = this
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum,
+        DepartmentName: that.formItem.DepartmentName,
+        StoreName: that.formItem.StoreName
+      }
+      that.tableLoading = true
+      api.getWorkHoursDefintionList(data).then((response) => {
+        if (response.error_code === 'Success') {
+          let res = response.data
+          that.list = res.list
+          that.tableLoading = false
+          that.page = res.page
+          that.tablePage.allNum = res.total
+          that.tablePage.maxPageNum = res.totalPage
+          that.setPage()
+        } else {
+          that.$Message.error(response.error_message)
+        }
+      })
+    },
+    exportTable() {
+      let that = this
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      })
+    },
+    getShiftsList() {
+      let that = this
+      api.getShiftsDropdownList().then((response) => {
+        if (response.error_code === 'Success') {
+          console.log('3')
+          that.shiftsList = response.data.list
+        } else {
+          that.$Message.error(response.error_message)
+        }
+      })
+    }
+  },
+  mounted() {
+    let that = this
+    that.$nextTick(() => {
+      that.initTableHeight()
+      that.getList()
+      that.getShiftsList()
+      let pageName = that.$route.name
+      let list = that.authorList[pageName]
+    })
+  }
+}
+</script>
+<style>
+</style>
+

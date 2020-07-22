@@ -1,0 +1,306 @@
+
+<template>
+  <div class="QYjysh-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="month" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <Select v-model="formItem.Type1" placeholder="月旬" :filterable="true">
+              <Option v-for="item in Type1" :value="item.ID" :key="item.ID" @click.native="changeType1(item.Name,item.ID)">{{ item.Name }}</Option>
+            </Select>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="StartDate1">
+              <DatePicker class="DatePicker_time" type="month" :options="options1" placeholder="结束日期" v-model="formItem.StartDate1" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+
+          <i-col span="3">
+            <Select v-model="formItem.Type2" placeholder="月旬" :filterable="true">
+              <Option v-for="item in Type2" :value="item.Name" :key="item.ID" @click.native="changeType2(item.Name,item.ID)">{{ item.Name }}</Option>
+            </Select>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="sCityName">
+              <Select v-model="formItem.sCityName" placeholder="门店" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="9">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="searchList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+
+    </div>
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          完成率排名
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      Yunx1: "第一时间段",
+      Yunx2: "第二时间段",
+      spinShow: true,
+      formItem: {
+        startDate: new Date(),
+        StartDate1: new Date(),
+        Type1: "",
+        Type2: "",
+        sCity: "",
+        sCityName: ""
+      },
+      list: [],
+      list1: [],
+      storeList: [],
+      Type1: [
+        { ID: 1, Name: "上旬" },
+        { ID: 2, Name: "中旬" },
+        { ID: 3, Name: "下旬" }
+      ],
+      Type2: [
+        { ID: 1, Name: "上旬" },
+        { ID: 2, Name: "中旬" },
+        { ID: 3, Name: "下旬" }
+      ]
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    changeType1(name, id) {
+      let that = this;
+      that.formItem.Type1 = id;
+      that.Yunx1 = "第一时间段" + name;
+    },
+    changeType2(name, id) {
+      let that = this;
+      that.formItem.Type2 = id;
+      that.Yunx2 = "第二时间段" + name;
+    },
+    choose(name, id) {
+      this.formItem.sCity = id;
+    },
+    searchList() {
+      let that = this;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    setEcharts(pieData, pieData1, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: ["#003366", "#e5323e"],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              type: "shadow"
+            }
+          },
+          legend: {
+            data: [that.Yunx1, that.Yunx2]
+          },
+          toolbox: {
+            show: true,
+            orient: "vertical",
+            left: "right",
+            top: "center",
+            feature: {
+              mark: { show: true },
+              dataView: { show: true, readOnly: false },
+              magicType: {
+                show: true,
+                type: ["line", "bar", "stack", "tiled"]
+              },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
+          },
+          calculable: true,
+          xAxis: [
+            {
+              type: "category",
+              axisTick: { show: false },
+              data: barName,
+              axisLabel: {
+                interval: 0, //横轴信息全部显示
+                rotate: -30 //-30度角倾斜显示
+              }
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+            }
+          ],
+          series: [
+            {
+              name: that.Yunx1,
+              type: "bar",
+              barGap: 0,
+              data: pieData
+            },
+            {
+              name: that.Yunx2,
+              type: "bar",
+              data: pieData1
+            }
+          ]
+        };
+        var opt = optionPie.series;
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          EmployeeId: that.userMes.EmployeeID,
+          ReportType: "4",
+          StartDate: that.formItem.startDate,
+          StartDate1: that.formItem.StartDate1,
+          Type1: that.formItem.Type1,
+          Type2: that.formItem.Type2,
+          AreaId: that.formItem.sCity
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM");
+        }
+        if (data.StartDate1) {
+          data.StartDate1 = moment(data.StartDate1).format("YYYY-MM");
+        }
+        that.spinShow = true;
+        that.list = [];
+        that.list1 = [];
+        api.AreaPerformanceCompletionRateReport(data).then(response => {
+          if (response.error_code === "Success") {
+            let res = response.data;
+            that.list = res.Item1;
+            that.list1 = res.Item2;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 200);
+    },
+    // 获取区域列表
+    getCity() {
+      let that = this;
+      api.GetAllCityInfo().then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.sCityName = that.storeList[0].Name;
+          that.formItem.sCity = that.storeList[0].ID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setPieData() {
+      let that = this;
+      let pieData = [];
+      let pieData1 = [];
+      let barName = [];
+      for (let i in that.list) {
+        let a = {
+          value: that.list[i].Rate.toFixed(2),
+          value1: that.list1[i].Rate.toFixed(2),
+          StoreName: that.list[i].StoreName
+        };
+        pieData.push(a.value);
+        pieData1.push(a.value1);
+        barName.push(a.StoreName);
+      }
+
+      that.setEcharts(pieData, pieData1, barName);
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+    that.getCity();
+  }
+};
+</script>
+<style>
+</style>
+
+

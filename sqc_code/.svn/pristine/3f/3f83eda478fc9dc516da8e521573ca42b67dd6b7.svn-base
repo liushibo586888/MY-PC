@@ -1,0 +1,1785 @@
+<template>
+    <div class="xmgl-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+                <row :gutter="20">
+                    <!-- 分类名称 -->
+                    <i-col span="3">
+                        <FormItem prop="Name">
+                            <Input v-model="formItem.Name" placeholder="项目名称"></Input>
+                        </FormItem>
+                    </i-col>
+                    <!-- 是否有效 -->
+                    <i-col span="3">
+                        <FormItem prop="Valid">
+                            <Select v-model="formItem.Valid" placeholder="是否有效">
+                                <Option :value="-1">全部</Option>
+                                <Option :value="1">有效</Option>
+                                <Option :value="0">无效</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <!-- 分类级别 -->
+                    <i-col span="3">
+                        <formItem prop="TopCategoryID">
+                            <Select v-model="formItem.TopCategoryID" placeholder="顶级分类" :clearable="true" @on-change="changeList">
+                                <Option :value="item.ID" :key="index" v-for="(item, index) in oneStageList">{{item.Name}}</Option>
+                            </Select>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="SubCategoryID">
+                            <Select v-model="formItem.SubCategoryID" placeholder="二级分类" :clearable="true">
+                                <Option :value="item.ID" :key="index" v-for="(item, index) in twoStageList">{{item.Name}}</Option>
+                            </Select>
+                        </formItem>
+                    </i-col>
+                    <i-col span="12">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="searchList">搜索</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                            <i-button type="primary" class="btn btn-add" @click="showAddPoup" v-if="setAuthorAdd">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="getDetail" v-if="setAuthorEdit" :disabled="!rowID">修改</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" :height="setTableHeight" ref="mainTable" highlight-row @on-current-change="getRowID"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+        <!-- 新增弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" class="dialog" :width="1200" v-if="setAuthorAdd || setAuthorEdit">
+            <div slot='header' class="header">
+                {{modalTitle}}
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="140" @submit.native.prevent class="form">
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="Image" label="项目图片：">
+                            <!-- <FormItem prop="Image" label="项目图片：" :rules="formValidateRule.Image"> -->
+                            <div class="input-box">
+                                <img :src="formValidate.Image" v-if="formValidate.Image">
+                                <Icon type="camera" v-else class="icon-camera"></Icon>
+                                <input type="file" accept="image/gif,image/jpeg,image/jpg,image/png,image/svg" @change="uploadImg" ref="image">
+                            </div>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="Name" label="项目名称：" :rules="formValidateRule.Name">
+                            <Input v-model="formValidate.Name" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="SimpleCode" label="名称简码：" :rules="formValidateRule.SimpleCode">
+                            <Input v-model="formValidate.SimpleCode" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="Alias" label="别名：" :rules="formValidateRule.Alias">
+                            <Input v-model="formValidate.Alias" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+
+                    <i-col span="8">
+                        <FormItem prop="Unit" label="项目单位：" :rules="formValidateRule.Unit">
+                            <Input v-model="formValidate.Unit" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="Standard" label="项目规格：">
+                            <!-- <FormItem prop="Standard" label="项目规格：" :rules="formValidateRule.Standard"> -->
+                            <Input v-model="formValidate.Standard" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="IsSuccess" label="是否计算成交：" :rules="formValidateRule.IsSuccess">
+                            <RadioGroup v-model="formValidate.IsSuccess">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="UnitPrice" label="单价：" :rules="formValidateRule.UnitPrice">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.UnitPrice" style="width:100%;" placeholder="请输入"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="MinPrice" label="最低价：" :rules="formValidateRule.MinPrice">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.MinPrice" style="width:100%;" placeholder="请输入"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="MaxPrice" label="最高价：" :rules="formValidateRule.MaxPrice">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.MaxPrice" style="width:100%;" placeholder="请输入"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="AllowChangePrice" label="允许修改单价：" :rules="formValidateRule.AllowChangePrice">
+                            <RadioGroup v-model="formValidate.AllowChangePrice">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="ItemTopCategoryID" label="顶级分类：" :rules="formValidateRule.ItemTopCategoryID">
+                            <Select v-model="formValidate.ItemTopCategoryID" placeholder="请输入" @on-change="changeList1">
+                                <Option :value="item.ID" v-for="(item, index) in oneStageList" :key="index">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="ItemCategoryID" label="二级分类：" :rules="formValidateRule.ItemCategoryID" v-if="showTowStage">
+                            <Select v-model="formValidate.ItemCategoryID" placeholder="请选择" :transfer="true">
+                                <Option :value="item.ID" v-for="(item, index) in twoStageList1" :key="index">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <!-- <i-col span="8">
+                        <FormItem prop="IsExperience" label="是否体验：" :rules="formValidateRule.IsExperience">
+                            <RadioGroup v-model="formValidate.IsExperience">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="ExperiencePrice" label="体验价格：" v-if="!formValidate.IsExperience > 0">
+                            <Input v-model="formValidate.ExperiencePrice" style="width:100%;" disabled></Input>
+                        </FormItem>
+                        <FormItem prop="ExperiencePrice" label="体验价格：" v-else :rules="formValidateRule.ExperiencePrice">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.ExperiencePrice" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col> -->
+
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="AllowSconto" label="允许打折：" :rules="formValidateRule.AllowSconto">
+                            <RadioGroup v-model="formValidate.AllowSconto">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="ItemType" label="项目类型：" :rules="formValidateRule.ItemType">
+                            <Select v-model="formValidate.ItemType" placeholder="请输入" @on-change="setItemType">
+                                <Option :value="item.ID" v-for="(item, index) in itemTypeList" :key="index">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="SecondItemType" label="项目类型二：" :rules="formValidateRule.SecondItemType">
+                            <Select v-model="formValidate.SecondItemType" placeholder="请输入">
+                                <Option :value="item.ID" v-for="(item, index) in secondItemTypeList" :key="index">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="IsTreatment" label="是否疗程：" :rules="formValidateRule.IsTreatment">
+                            <RadioGroup v-model="formValidate.IsTreatment" @on-change="chooseTreatment">
+                                <Radio :label="1" :disabled="formValidate.ItemType == 3 || formValidate.ItemType == 4 || formValidate.IsDeadlineProject == 1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0" :disabled="formValidate.ItemType == 3 || formValidate.ItemType == 4 || formValidate.IsDeadlineProject == 1">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="TreatmentTimes" label="疗程次数：" v-if="!formValidate.IsTreatment > 0">
+                            <Input style="width:100%;" disabled></Input>
+                        </FormItem>
+                        <FormItem prop="TreatmentTimes" label="疗程次数：" :rules="formValidateRule.TreatmentTimes" v-else>
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.TreatmentTimes" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="ExecuteTime" label="治疗时间（分钟）：" :rules="formValidateRule.ExecuteTime">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.ExecuteTime" style="width:100%;"></InputNumber>
+                            <!-- <TimePicker type="time" v-model="formValidate.ExecuteTime" style="width:100%;"></TimePicker> -->
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="IsDeadlineProject" label="是否期限项目：" :rules="formValidateRule.IsDeadlineProject">
+                            <RadioGroup v-model="formValidate.IsDeadlineProject" @on-change="chooseIsDeadlineProject">
+                                <Radio :label="1" :disabled="formValidate.ItemType == 3 || formValidate.ItemType == 4 || formValidate.IsTreatment == 1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0" :disabled="formValidate.ItemType == 3 || formValidate.ItemType == 4 || formValidate.IsTreatment == 1">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="EffectiveTime" label="持续时间（天）：" :rules="formValidateRule.EffectiveTime" v-if="formValidate.IsDeadlineProject == 1">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.EffectiveTime" style="width:100%;"></InputNumber>
+                        </FormItem>
+                        <FormItem prop="EffectiveTime" label="持续时间（天）：" v-show="formValidate.IsDeadlineProject !== 1">
+                            <Input style="width:100%;" disabled></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8" v-if="formValidate.IsDeadlineProject || formValidate.ItemType == 4">
+                        <FormItem prop="MaxExecutionFrequency" label="最大执行次数：" :rules="formValidateRule.MaxExecutionFrequency">
+                            <InputNumber :max="999999999999999" :min="0" v-model="formValidate.MaxExecutionFrequency" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8" v-show="!formValidate.IsDeadlineProject && formValidate.ItemType != 4">
+                        <FormItem prop="MaxExecutionFrequency" label="最大执行次数：">
+                            <Input style="width:100%;" disabled></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="IsExecute" label="是否执行项目：" :rules="formValidateRule.IsExecute">
+                            <RadioGroup v-model="formValidate.IsExecute">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="AllowCashVoucher" label="允许使用代金券：" :rules="formValidateRule.AllowCashVoucher">
+                            <RadioGroup v-model="formValidate.AllowCashVoucher">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="AllowIntegration" label="使用积分：" :rules="formValidateRule.AllowIntegration">
+                            <RadioGroup v-model="formValidate.AllowIntegration">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="8">
+                        <FormItem prop="Valid" label="是否有效：" :rules="formValidateRule.Valid">
+                            <RadioGroup v-model="formValidate.Valid">
+                                <Radio :label="1">
+                                    <span>是</span>
+                                </Radio>
+                                <Radio :label="0">
+                                    <span>否</span>
+                                </Radio>
+                            </RadioGroup>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <!-- 物资列表明细 -->
+                <div class="pannel-title">
+                    <p>物资列表</p>
+                    <div>
+                        <i-button type="text" class="Shenqing-font" @click="showSmallModal(0)" size="small">添加物资</i-button>
+                    </div>
+                </div>
+                <!-- 添加、修改 -->
+                <div class="table-box" style="margin-top:0; margin-bottom:20px;">
+                    <i-table stripe :columns="choosedItemColumns" :data="choosedItemList" :height="300"></i-table>
+                </div>
+                <row type="flex" justify="end" style="margin-bottom: 20px; color: #fc5427; font-size: 14px; font-weight: bold;">
+                </row>
+
+                <Input v-model="formValidate.Remark" placeholder="备注" type="textarea" :rows="4"></Input>
+
+            </Form>
+            <div slot="footer" class="footer">
+                <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+                <Button type="warning" class="btn" @click="resetForm" :loading="loading">取消</Button>
+            </div>
+        </Modal>
+        <!-- ** -->
+
+        <!-- 物资弹窗 -->
+        <Modal :mask-closable="false" v-model="modal2" width="1200" class="dialog">
+            <div slot='header' class="header not-print">
+                选择产品
+            </div>
+            <div slot='close' class="close not-print">
+                <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+            </div>
+            <Input v-model="searchKeyWord" placeholder="请输入项目名称" style="width: 300px; margin: 2px 0 2px 0;" icon="search"></Input>
+            <div class="table-box">
+                <!-- 物资 -->
+                <i-table stripe :columns="materialsColumn" :data="setMaterialtData" @on-selection-change="selectMaterial" :height="500"></i-table>
+            </div>
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="smalladdForm" :loading="onLoading">保存</Button>
+                <Button class="btn" type="warning" @click="smallResetForm" :loading="onLoading">取消</Button>
+            </div>
+        </Modal>
+    </div>
+</template>
+<script>
+import Exif from "exif-js";
+import manager from "@/api/manager.js";
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    const timesCheck = (rule, value, callback) => {
+      if (value === "") {
+        callback(new Error("请填写"));
+      } else if (value <= 0) {
+        callback(new Error("不得小于0"));
+      } else {
+        callback();
+      }
+    };
+    return {
+      modal2: false,
+      onLoading: false,
+      searchKeyWord: "",
+      materialsData: [],
+      choosedItemList: [],
+      selection: [],
+      selectionCustoms: [],
+      volumeTypes: [
+        {
+          id: 0,
+          name: "否"
+        },
+        {
+          id: 1,
+          name: "是"
+        }
+      ],
+      //选中后表头
+      choosedItemColumns: [
+        {
+          title: "产品名称",
+          key: "ProductName",
+          align: "center"
+        },
+        {
+          title: "产品编码",
+          key: "ProductNum",
+          align: "center"
+        },
+        {
+          title: "单位",
+          key: "Unit",
+          align: "center"
+        },
+        {
+          title: "规格",
+          key: "Standard",
+          align: "center"
+        },
+        {
+          title: "数量",
+          key: "num",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写数量",
+                  value: params.row.num,
+                  max: 9999999,
+                  min: 1
+                },
+                on: {
+                  "on-change": function(e) {
+                    that.$nextTick(() => {
+                      params.row.num = e;
+                      that.choosedItemList[params.index] = params.row;
+                    });
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "是否赠送",
+          align: "center",
+          key: "IsFree",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Checkbox",
+                {
+                  props: {
+                    value: that.choosedItemList[params.index].IsFree,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      params.row.IsFree = event;
+                    }
+                  }
+                }
+              )
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          key: "action",
+          align: "center",
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                style: {},
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.index);
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      materialsColumn: [
+        //物资列表头
+        {
+          type: "selection",
+          width: 80
+        },
+        {
+          title: "产品编号",
+          key: "ProductNum",
+          align: "center"
+        },
+        {
+          title: "产品名称",
+          key: "ProductName",
+          align: "center"
+        },
+        {
+          title: "单位",
+          key: "Unit",
+          align: "center"
+        },
+        {
+          title: "单价",
+          key: "Price",
+          align: "center"
+        },
+        {
+          title: "散装个数",
+          key: "StockQuantity",
+          align: "center"
+        },
+        {
+          title: "规格",
+          key: "Standard",
+          align: "center"
+        },
+        {
+          title: "描述",
+          key: "LocalName",
+          align: "center"
+        }
+      ],
+      ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+      showTowStage: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableLoading: false,
+      rowID: null,
+      loading: false,
+      tableHeight: 200,
+      modalTitle: "修改",
+      phone: "",
+      modal1: false,
+      formValidate: {
+        ID: "",
+        Image: "",
+        Name: "",
+        SimpleCode: "",
+        Alias: "",
+        Unit: "",
+        Standard: "",
+        UnitPrice: null,
+        MinPrice: null,
+        MaxPrice: null,
+        IsExperience: 0,
+        ExecuteTime: null,
+        ExperiencePrice: null,
+        ItemTopCategoryID: "",
+        ItemCategoryID: "",
+        AllowIntegration: 0,
+        IsTreatment: 0,
+        TreatmentTimes: null,
+        AllowChangePrice: 0,
+        AllowSconto: 0,
+        AllowCashVoucher: 0,
+        IsSuccess: 1,
+        IsExecute: 1,
+        Valid: 1,
+        Remark: "",
+        ItemType: "",
+        SecondItemType: "",
+        IsDeadlineProject: 0,
+        MaxExecutionFrequency: null,
+        EffectiveTime: null
+      },
+      formValidateRule: {
+        Image: { required: true, message: "项目图片不得为空", trigger: "blur" },
+        Name: { required: true, message: "项目名称不得为空", trigger: "blur" },
+        Alias: { required: true, message: "别名不得为空", trigger: "blur" },
+        SimpleCode: {
+          required: true,
+          message: "名称简码不得为空",
+          trigger: "blur"
+        },
+        Unit: { required: true, message: "项目单位不得为空", trigger: "blur" },
+        Standard: {
+          required: true,
+          message: "项目规格不得为空",
+          trigger: "blur"
+        },
+        MinPrice: {
+          required: true,
+          message: "最低价不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        UnitPrice: {
+          required: true,
+          message: "单价不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        MaxPrice: {
+          required: true,
+          message: "最高价不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        ItemCategoryID: {
+          required: true,
+          message: "项目分类不得为空",
+          trigger: "blur"
+        },
+        ItemTopCategoryID: {
+          required: true,
+          message: "顶级分类不得为空",
+          trigger: "blur"
+        },
+        IsSuccess: {
+          required: true,
+          message: "计算成交不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        IsExperience: {
+          required: true,
+          message: "是否体验不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        IsTreatment: {
+          required: true,
+          message: "是否疗程不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        AllowIntegration: {
+          required: true,
+          message: "使用积分不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        AllowSconto: {
+          required: true,
+          message: "允许打折不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        AllowCashVoucher: {
+          required: true,
+          message: "允许使用代金券不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        AllowChangePrice: {
+          required: true,
+          message: "允许修改单价不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        ExperiencePrice: {
+          required: true,
+          message: "体验价格不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        ExecuteTime: {
+          required: true,
+          message: "治疗时间不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        IsExecute: {
+          required: true,
+          message: "执行项目不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        Valid: {
+          required: true,
+          message: "是否有效不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        TreatmentTimes: {
+          required: true,
+          message: "疗程次数不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        ItemType: {
+          required: true,
+          message: "项目类型不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        IsDeadlineProject: {
+          required: true,
+          message: "是否期限不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        SecondItemType: {
+          required: true,
+          message: "项目类型二不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        MaxExecutionFrequency: {
+          required: true,
+          message: "最大执行次数不得为空不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        },
+        EffectiveTime: {
+          required: true,
+          message: "持续时间不得为空且必须大于0",
+          trigger: "blur",
+          type: "number",
+          validator: timesCheck
+        }
+      },
+      formItem: {
+        Name: "",
+        Valid: "",
+        TopCategoryID: "",
+        SubCategoryID: ""
+      },
+      oneStageList: [],
+      twoStageList: [],
+      twoStageList1: [],
+      columns1: [
+        {
+          title: "项目名称",
+          key: "Name",
+          width: 300,
+          fixed: "left",
+          align: "center"
+          // render: (h, params) => {
+          //     if (!params.row.Name) {
+          //         return ''
+          //     }
+          //     let text = params.row.Name
+          //     if (text.length > 5) {
+          //         text = text.substr(0, 5) + '...'
+          //     }
+          //     return h('Tooltip', {
+          //         props: {
+          //             content: params.row.Name,
+          //             placement: 'right'
+          //         }
+          //     }, text)
+          // }
+        },
+        {
+          title: "项目单位",
+          key: "Unit",
+          width: 100,
+          fixed: "left",
+          align: "center"
+        },
+        {
+          title: "项目规格",
+          key: "Standard",
+          width: 100,
+          fixed: "left",
+          align: "center"
+        },
+        {
+          title: "别名",
+          key: "Alias",
+          width: 300,
+          align: "center"
+          // render: (h, params) => {
+          //     if (!params.row.Alias) {
+          //         return ''
+          //     }
+          //     let text = params.row.Alias
+          //     if (text.length > 5) {
+          //         text = text.substr(0, 5) + '...'
+          //     }
+          //     return h('Tooltip', {
+          //         props: {
+          //             content: params.row.Alias,
+          //             placement: 'top'
+          //         }
+          //     }, text)
+          // }
+        },
+        {
+          title: "单价",
+          key: "UnitPrice",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.UnitPrice) {
+              return "";
+            }
+            return h("div", {}, params.row.UnitPrice.toFixed(2));
+          }
+        },
+        {
+          title: "最高价",
+          key: "MaxPirce",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.MaxPirce) {
+              return "";
+            }
+            return h("div", {}, params.row.MaxPirce.toFixed(2));
+          }
+        },
+        {
+          title: "最低价",
+          key: "MinPrice",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.MinPrice) {
+              return "";
+            }
+            return h("div", {}, params.row.MinPrice.toFixed(2));
+          }
+        },
+        {
+          title: "项目分类",
+          key: "CategoryName",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "顶级分类",
+          key: "TopCategoryName",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "治疗时间",
+          key: "ExecuteTime",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "项目类型",
+          key: "ItemType",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "项目类型二",
+          key: "SecondItemType",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "是否期限项目",
+          key: "IsDeadlineProject",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.IsDeadlineProject ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "持续时间",
+          key: "EffectiveTime",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "最大执行次数",
+          key: "MaxExecutionFrequency",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "使用积分",
+          key: "LimitIntegration",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.LimitIntegration ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "是否疗程",
+          key: "IsTreatment",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.IsTreatment ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "疗程次数",
+          key: "TimesOfTreatment",
+          width: 180,
+          align: "center"
+        },
+        {
+          title: "允许修改单价",
+          key: "CanChangePrice",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.CanChangePrice ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "允许打折",
+          key: "LimitSconto",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.LimitSconto ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "允许使用代金券",
+          key: "LimitInsteadMoney",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.LimitInsteadMoney ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "是否计算成交",
+          key: "IsCountSuccess",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.IsCountSuccess ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "是否执行",
+          key: "IsMustExecute",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.IsMustExecut ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "是否有效",
+          key: "Valid",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.Valid ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "项目备注",
+          key: "Remark",
+          width: 180,
+          align: "center",
+          render: (h, parmas) => {
+            if (!parmas.row.Remark) {
+              return "";
+            }
+            let text =
+              parmas.row.Remark.length > 8
+                ? parmas.row.Remark.substr(0, 7) + "..."
+                : parmas.row.Remark;
+            return h(
+              "div",
+              {
+                on: {
+                  click: () => {
+                    this.showRemark(parmas.row.Remark);
+                  }
+                }
+              },
+              text
+            );
+          }
+        },
+        {
+          title: " "
+        }
+      ],
+      list: [],
+      itemTypeList: [],
+      secondItemTypeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    },
+    setAuthorAdd() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      }
+      return false;
+    },
+    setAuthorEdit() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "修改") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      }
+      return false;
+    },
+    setMaterialtData() {
+      // 过滤物资列表
+      let that = this;
+      let arr = [];
+      let idList = [];
+      let keyWord = that.searchKeyWord;
+      // 选中的商品不会出现在待选列表中
+      for (let i of that.choosedItemList) {
+        idList.push(i.id);
+      }
+      for (let i of that.materialsData) {
+        if (idList.indexOf(i.ID) <= -1) {
+          // 搜索
+          if (
+            i.ProductName.indexOf(keyWord) > -1 ||
+            i.ProductNum.indexOf(keyWord) > -1
+          ) {
+            arr.push(i);
+          }
+        }
+      }
+      return arr;
+    }
+  },
+  methods: {
+    addMode() {
+      // 添加
+      let that = this;
+      that.modal1 = true;
+    },
+    showDelDetailPoup(index) {
+      //删除一个物资
+      let that = this;
+      that.choosedItemList.splice(index, 1);
+    },
+    // 选择物资
+    selectMaterial(selection) {
+      // 选中的物资列表
+      let that = this;
+      that.selection = selection;
+    },
+    smalladdForm() {
+      let that = this;
+      // 选择物资
+      for (let i in that.selection) {
+        let a = {
+          BulkNum: that.selection[i].StockQuantity,
+          ProductNum: that.selection[i].ProductNum,
+          Unit: that.selection[i].Unit,
+          Standard: that.selection[i].Standard,
+          num: 1,
+          ProductName: that.selection[i].ProductName,
+          GoodsId: that.selection[i].BarCode,
+          Num: that.selection[i].Num
+        };
+        that.choosedItemList.push(a);
+      }
+      that.modal2 = false;
+      that.modal3 = false;
+    },
+    smallResetForm() {
+      let that = this;
+      that.modal2 = false;
+      that.modal3 = false;
+    },
+    showSmallModal() {
+      // 展示物资弹窗
+      let that = this;
+      that.searchKeyWord = "";
+      that.commit;
+      that.$store.commit("changeLoadingPage");
+      that.getSalesGoodsList();
+      that.modal2 = true;
+    },
+    getSalesGoodsList() {
+      // 获取出库产品列表
+      let that = this;
+      let data = {
+        employeeId: that.userMes.EmployeeID,
+        productName: that.searchKeyWord
+      };
+      api.selectInProduct(data).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          that.materialsData = response.data;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    showAddPoup() {
+      let that = this;
+      that.resetForm();
+      that.modal1 = true;
+      that.modalTitle = "新建";
+    },
+    modefyMessage(data) {
+      // 修改项目
+      let that = this;
+      manager.modefySingleItems(that.formValidate.ID, data).then(response => {
+        that.loading = false;
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.resetForm();
+          that.getList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    searchList() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.loading = true;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.loading = true;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    resetForm() {
+      let that = this;
+      that.formValidate.ID = "";
+      that.formValidate.Remark = "";
+      that.$refs.image.value = "";
+      that.twoStageList = [];
+      that.choosedItemList = [];
+      that.$refs.formValidate1.resetFields();
+      that.formValidate.ItemCategoryID = null;
+      that.modal1 = false;
+    },
+    addForm() {
+      // 新增
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          let data = {
+            Image:
+              that.formValidate.Image == "" ? null : that.formValidate.Image,
+            Name: that.formValidate.Name,
+            SimpleCode: that.formValidate.SimpleCode,
+            Alias: that.formValidate.Alias,
+            Unit: that.formValidate.Unit,
+            Standard: that.formValidate.Standard,
+            UnitPrice: that.formValidate.UnitPrice,
+            MinPrice: that.formValidate.MinPrice,
+            MaxPrice: that.formValidate.MaxPrice,
+            ItemTopCategoryID: that.formValidate.ItemTopCategoryID,
+            ItemCategoryID: that.formValidate.ItemCategoryID,
+            AllowIntegration: "",
+            IsTreatment: "",
+            TreatmentTimes: that.formValidate.TreatmentTimes,
+            AllowChangePrice: "",
+            AllowSconto: "",
+            AllowCashVoucher: "",
+            IsSuccess: "",
+            IsExecute: "",
+            Valid: "",
+            // ExperiencePrice: that.formValidate.ExperiencePrice,
+            ExecuteTime: that.formValidate.ExecuteTime,
+            Remark: that.formValidate.Remark,
+            ItemType: that.formValidate.ItemType,
+            SecondItemType: that.formValidate.SecondItemType,
+            MaxExecutionFrequency: that.formValidate.MaxExecutionFrequency,
+            EffectiveTime: that.formValidate.EffectiveTime,
+            ItemIngredients: []
+          };
+          // 添加物资记录
+          for (let i of that.choosedItemList) {
+            let a = {
+              BulkNum: i.BulkNum,
+              GoodsId: i.ProductNum,
+              Num: i.num,
+              IsFree: i.IsFree
+            };
+            data.ItemIngredients.push(a);
+          }
+          // data.Image = data.Image.replace('data:image/jpeg;base64,', '')
+          data.AllowIntegration = that.formValidate.AllowIntegration > 0;
+          data.IsTreatment = that.formValidate.IsTreatment > 0;
+          data.AllowChangePrice = that.formValidate.AllowChangePrice > 0;
+          data.AllowSconto = that.formValidate.AllowSconto > 0;
+          data.AllowCashVoucher = that.formValidate.AllowCashVoucher > 0;
+          data.IsSuccess = that.formValidate.IsSuccess > 0;
+          data.IsExecute = that.formValidate.IsExecute > 0;
+          data.Valid = that.formValidate.Valid > 0;
+          data.IsDeadlineProject = that.formValidate.IsDeadlineProject > 0;
+          // data.IsExperience = that.formValidate.IsExperience > 0 ? true : false
+          // 单价不得小于最低价 不得大于最高价格
+          if (data.UnitPrice < data.MinPrice) {
+            that.$Message.error("单价不得小于最低价");
+            return false;
+          }
+          if (data.UnitPrice > data.MaxPrice) {
+            that.$Message.error("单价不得大于最高价");
+            return false;
+          }
+          if (data.MaxPrice < data.MinPrice) {
+            that.$Message.error("最高价不得小于最低价");
+            return false;
+          }
+          if (!data.IsTreatment) {
+            // 不是疗程的时候疗程次数为空
+            data.TreatmentTimes = "";
+          }
+          if (!data.IsExperience) {
+            // 不是体验项目时体验价格为空
+            data.ExperiencePrice = "";
+          }
+          // if (!data.IsDeadlineProject) {
+          //     data.MaxExecutionFrequency = ''
+          // }
+
+          that.loading = true;
+          if (that.modalTitle === "修改") {
+            that.modefyMessage(data);
+            return false;
+          }
+          manager.addItems(data).then(response => {
+            that.loading = false;
+            if (response.error_code === "Success") {
+              that.$Message.success("添加成功");
+              that.resetForm();
+              that.getList();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          this.$Message.error("有必填项为空");
+        }
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      let data = {
+        Name: that.formItem.Name,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum,
+        TopCategoryID: that.formItem.TopCategoryID,
+        SubCategoryID: that.formItem.SubCategoryID,
+        Valid: ""
+      };
+      if (that.formItem.Valid === 1) {
+        data.Valid = true;
+      } else if (that.formItem.Valid === 0) {
+        data.Valid = false;
+      }
+      that.tableLoading = true;
+      manager.getItemsList(data).then(response => {
+        that.loading = false;
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.list = res.list;
+          that.tableLoading = false;
+          that.page = res.page;
+          that.tablePage.allNum = res.total;
+          that.tablePage.maxPageNum = res.totalPage;
+          that.setPage();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    changeList1(val) {
+      let that = this;
+      // that.formValidate.ItemCategoryID = ''
+      that.getTwiceList(val, 2);
+    },
+    changeList(val) {
+      let that = this;
+      // 更换列表
+      that.formItem.SubCategoryID = "";
+      that.getTwiceList(val, 1);
+    },
+    getTopList() {
+      // 获取顶级分类
+      let that = this;
+      manager.getTopList().then(response => {
+        if (response.error_code == "Success") {
+          that.oneStageList = response.data.list;
+          that.twoStageList = [];
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getTwiceList(val, type, status) {
+      // 根据顶级分类获取二级分类
+      // type1代表搜索 type2代表modal
+      let that = this;
+      if (!val) {
+        return false;
+      }
+      let data = {
+        ID: val
+      };
+      manager.getTwiceList(data).then(response => {
+        if (response.error_code == "Success") {
+          if (type > 1) {
+            that.twoStageList1 = response.data.list;
+            if (status) {
+              that.formValidate.ItemCategoryID = status.ItemCategoryID;
+              that.$set(
+                that.formValidate,
+                "ItemCategoryID",
+                status.ItemCategoryID
+              );
+            }
+          } else {
+            that.twoStageList = response.data.list;
+          }
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    uploadImg(e) {
+      let that = this;
+      let files = e.target.files || e.dataTransfer.files;
+      if (!files.length) return;
+      this.imgPreview(files[0]);
+    },
+    imgPreview(file) {
+      let that = this;
+      let Orientation;
+      // 去获取拍照时的信息，解决拍出来的照片旋转问题
+      Exif.getData(file, function() {
+        Orientation = Exif.getTag(this, "Orientation");
+      });
+      // 看支持不支持FileReader
+      if (!file || !window.FileReader) return;
+      if (/^image/.test(file.type)) {
+        // 创建一个reader
+        let reader = new FileReader();
+        // 将图片2将转成 base64 格式
+        reader.readAsDataURL(file);
+        // 读取成功后的回调
+        reader.onloadend = function() {
+          let result = this.result;
+          let img = new Image();
+          img.src = result;
+          // 判断图片是否大于100K,是就直接上传，反之压缩图片
+          if (this.result.length <= 100 * 1024) {
+            that.formValidate.Image = result;
+          } else {
+            img.onload = function() {
+              let data = that.compress(img, Orientation);
+              that.formValidate.Image = data;
+            };
+          }
+        };
+      }
+    },
+    rotateImg(img, direction, canvas) {
+      // 最小与最大旋转方向，图片旋转4次后回到原方向
+      const minStep = 0;
+      const maxStep = 3;
+      if (img == null) return;
+      // img的高度和宽度不能在img元素隐藏后获取，否则会出错
+      let height = img.height;
+      let width = img.width;
+      let step = 2;
+      if (step == null) {
+        step = minStep;
+      }
+      if (direction === "right") {
+        step++;
+        // 旋转到原位置，即超过最大值
+        step > maxStep && (step = minStep);
+      } else {
+        step--;
+        step < minStep && (step = maxStep);
+      }
+      // 旋转角度以弧度值为参数
+      let degree = step * 90 * Math.PI / 180;
+      let ctx = canvas.getContext("2d");
+      switch (step) {
+        case 0:
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0);
+          break;
+        case 1:
+          canvas.width = height;
+          canvas.height = width;
+          ctx.rotate(degree);
+          ctx.drawImage(img, 0, -height);
+          break;
+        case 2:
+          canvas.width = width;
+          canvas.height = height;
+          ctx.rotate(degree);
+          ctx.drawImage(img, -width, -height);
+          break;
+        case 3:
+          canvas.width = height;
+          canvas.height = width;
+          ctx.rotate(degree);
+          ctx.drawImage(img, -width, 0);
+          break;
+      }
+    },
+    compress(img, Orientation) {
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      // 瓦片canvas
+      let tCanvas = document.createElement("canvas");
+      let tctx = tCanvas.getContext("2d");
+      let initSize = img.src.length;
+      let width = img.width;
+      let height = img.height;
+      // 如果图片大于四百万像素，计算压缩比并将大小压至400万以下
+      let ratio;
+      if ((ratio = width * height / 4000000) > 1) {
+        ratio = Math.sqrt(ratio);
+        width /= ratio;
+        height /= ratio;
+      } else {
+        ratio = 1;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      // 铺底色
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // 如果图片像素大于100万则使用瓦片绘制
+      let count;
+      if ((count = width * height / 1000000) > 1) {
+        count = ~~(Math.sqrt(count) + 1); // 计算要分成多少块瓦片
+        // 计算每块瓦片的宽和高
+        let nw = ~~(width / count);
+        let nh = ~~(height / count);
+        tCanvas.width = nw;
+        tCanvas.height = nh;
+        for (let i = 0; i < count; i++) {
+          for (let j = 0; j < count; j++) {
+            tctx.drawImage(
+              img,
+              i * nw * ratio,
+              j * nh * ratio,
+              nw * ratio,
+              nh * ratio,
+              0,
+              0,
+              nw,
+              nh
+            );
+            ctx.drawImage(tCanvas, i * nw, j * nh, nw, nh);
+          }
+        }
+      } else {
+        ctx.drawImage(img, 0, 0, width, height);
+      }
+      // 修复ios上传图片的时候 被旋转的问题
+      if (Orientation !== "" && Orientation !== 1) {
+        switch (Orientation) {
+          case 6: // 需要顺时针（向左）90度旋转
+            this.rotateImg(img, "left", canvas);
+            break;
+          case 8: // 需要逆时针（向右）90度旋转
+            this.rotateImg(img, "right", canvas);
+            break;
+          case 3: // 需要180度旋转
+            this.rotateImg(img, "right", canvas); // 转两次
+            this.rotateImg(img, "right", canvas);
+            break;
+        }
+      }
+      // 进行最小压缩
+      let ndata = canvas.toDataURL("image/jpeg", 0.5);
+      // console.log('压缩前：' + initSize)
+      // console.log('压缩后：' + ndata.length)
+      // console.log('压缩率：' + ~~(100 * (initSize - ndata.length) / initSize) + '%')
+      tCanvas.width = tCanvas.height = canvas.width = canvas.height = 0;
+      return ndata;
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+    },
+    getDetail() {
+      // 获取项目详情 编辑
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条记录");
+        return false;
+      }
+      that.resetForm();
+      that.showTowStage = false;
+      that.$store.commit("changeLoadingPage");
+      manager.getSingleItems(that.rowID).then(response => {
+        that.$store.commit("changeLoadingPage");
+        setTimeout(() => {
+          that.showTowStage = true;
+        }, 200);
+        if (response.error_code === "Success") {
+          that.setDetailData(response.data);
+          that.getTwiceList(response.data.ItemTopCategoryID, 2, response.data);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setDetailData(res) {
+      // 显示详情数据
+      let that = this;
+      that.choosedItemList = [];
+      that.formValidate = res;
+      that.formValidate.ID = res.ID;
+      that.formValidate.Image = res.Image
+        ? "data:image/jpeg;base64," + res.Image
+        : "";
+      that.formValidate.AllowIntegration = res.AllowIntegration ? 1 : 0;
+      that.formValidate.IsTreatment = res.IsTreatment ? 1 : 0;
+      // that.formValidate.TreatmentTimes = res.TreatmentTimes ? 1 : 0
+      that.formValidate.AllowChangePrice = res.AllowChangePrice ? 1 : 0;
+      that.formValidate.AllowSconto = res.AllowSconto ? 1 : 0;
+      that.formValidate.AllowCashVoucher = res.AllowCashVoucher ? 1 : 0;
+      that.formValidate.IsSuccess = res.IsSuccess ? 1 : 0;
+      that.formValidate.IsExecute = res.IsExecute ? 1 : 0;
+      that.formValidate.Valid = res.Valid ? 1 : 0;
+      that.formValidate.IsDeadlineProject = res.IsDeadlineProject ? 1 : 0;
+      that.formValidate.ItemType = res.ItemType;
+      that.formValidate.MaxExecutionFrequency = res.MaxExecutionFrequency;
+      that.formValidate.EffectiveTime = res.EffectiveTime;
+      that.formValidate.TreatmentTimes = res.TreatmentTimes;
+      that.formValidate.ItemCategoryID = res.ItemCategoryID;
+      // that.formValidate.IsExperience = res.IsExperience ? 1 : 0
+      for (let i in res.ItemIngredients) {
+        let dom = res.ItemIngredients[i];
+        let a = {
+          BulkNum: dom.BulkNum,
+          ProductName: dom.Name,
+          ProductNum: dom.GoodsId,
+          Standard: dom.Standard,
+          IsFree: dom.IsFree,
+          Unit: dom.Unit,
+          num: dom.Num
+        };
+        that.choosedItemList.push(a);
+      }
+      that.modalTitle = "修改";
+      that.modal1 = true;
+    },
+    getItemTypeList() {
+      // 获取项目类型列表
+      let that = this;
+      manager.getItemType().then(response => {
+        if (response.error_code === "Success") {
+          that.itemTypeList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getSecondItemTypeList() {
+      // 获取项目类型二列表
+      let that = this;
+      manager.getSecondItemType().then(response => {
+        if (response.error_code === "Success") {
+          that.secondItemTypeList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setItemType(val) {
+      let that = this;
+      if (val == 3) {
+        // 年卡项目必须是期限项目 持续时间 最大执行次数必填 是否疗程不可选
+        that.formValidate.IsDeadlineProject = 1;
+        that.formValidate.IsTreatment = 0;
+        that.formValidate.TreatmentTimes = null;
+      }
+      if (val == 4) {
+        // 包干项目必须填写最大执行次数；是否疗程、期限项目不可选
+        that.formValidate.IsDeadlineProject = 0;
+        that.formValidate.IsTreatment = 0;
+        that.formValidate.EffectiveTime = null;
+      }
+    },
+    chooseTreatment(val) {
+      // 选择疗程项目
+      let that = this;
+      if (val == 1) {
+        // 选择疗程项目时，疗程次数必填（大于0）；是否期限为否，持续时间、最大执行次数清空且不可填写
+        that.formValidate.IsDeadlineProject = 0;
+        that.formValidate.ItemType = null;
+        that.formValidate.EffectiveTime = null;
+        that.formValidate.TreatmentTimes = null;
+        that.formValidate.MaxExecutionFrequency = null;
+      } else {
+        // 不是疗程 疗程次数清空
+        that.formValidate.TreatmentTimes = null;
+      }
+    },
+    chooseIsDeadlineProject(val) {
+      // 选择期限项目
+      let that = this;
+      if (val == 1) {
+        // 选择期限项目时,是否疗程为否，疗程次数清空且不可填写
+        that.formValidate.IsTreatment = 0;
+        that.formValidate.TreatmentTimes = null;
+      } else {
+        // 不是期限项目 清空最大执行次数
+        that.formValidate.MaxExecutionFrequency = null;
+        that.formValidate.EffectiveTime = null;
+      }
+    },
+    showRemark(text) {
+      // 显示备注
+      let that = this;
+      that.$Modal.info({
+        title: "详情",
+        content: text
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getTopList();
+      that.getItemTypeList();
+      that.getSecondItemTypeList();
+      that.getList();
+    });
+  }
+};
+</script>
+<style>
+.input-box {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border: 2px dashed #dddee1;
+  text-align: center;
+}
+.input-box:hover {
+  border-color: #79aa49;
+  cursor: pointer;
+}
+.input-box input[type="file"] {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  display: block;
+  left: 0;
+  top: 0;
+  opacity: 0;
+}
+.input-box input[type="file"]:hover {
+  cursor: pointer;
+}
+.input-box > img {
+  position: relative;
+  vertical-align: top;
+  width: 100%;
+  height: 100%;
+}
+.icon-camera {
+  font-size: 32px;
+  line-height: 60px;
+  color: #666;
+}
+</style>

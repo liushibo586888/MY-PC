@@ -1,0 +1,441 @@
+ <template>
+    <div class="employeeScheduling-container container">
+      <div class="search-box">
+          <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+              <row :gutter="20">
+                  <i-col span="3">
+                      <formItem prop="Date">
+                          <Date-picker type="month" placeholder="开始日期" v-model="formItem.Date" :clearable="false" :editable="false"></Date-picker>
+                      </formItem>
+                  </i-col>
+                  <i-col span="3">
+                      <formItem class="btn-box">
+                          <i-button type="primary" class="btn btn-search" @click="seeHuman" v-if="setAuthor">查看排班</i-button>
+                      </formItem>
+                  </i-col>
+                  <i-col span="18">
+                      <formItem class="btn-box">
+                      </formItem>
+                  </i-col>
+              </row>
+          </Form>
+          <!-- 提示框 -->
+          <div class="tips-box">
+            <div class="tips">
+              <div class="dot" style="background:rgb(251, 84, 39)"></div>
+              <div class="text">未排班</div>
+            </div>
+            <div class="tips">
+              <div class="dot" style="background:rgb(43, 191, 217)"></div>
+              <div class="text">休息</div>
+            </div>
+            <div class="tips">
+              <div class="dot" style="background:rgb(252, 184, 38)"></div>
+              <div class="text">晚班</div>
+            </div>
+            <div class="tips">
+              <div class="dot" style="background:rgb(141, 206, 75)"></div>
+              <div class="text">早班</div>
+            </div>
+            <div class="title">标注：</div>
+          </div>
+      </div>
+      <div class="table-box">
+        <Row style="height:100%;">
+          <i-col span="3" style="height:100%;">
+            <div style="width:100%;height:100%; padding-top:34px;border: 1px solid rgb(235, 235, 235);">
+              <!-- <div class="storeName">{{storeName}}</div> -->
+              <div class="beautician-list" style="width:100%; height:100%; overflow-y:auto;">
+                <div class="beautician-item" v-for="(i, index) in humanList" :class="{'active' : beauticianIndex == index}" @click="chooseBeautician(index)">
+                    <div class="beautician-avatar" v-if="i.EmployeeImage" style="width:40px;height:40px; border-radius:50%; margin-right:10px; background-size: 100% 100%;" :style="'background-image:url(data:image/jpeg;base64,'+ i.EmployeeImage +')'"></div>
+                    <div class="beautician-name">{{i.EmployeeName}}</div>
+                </div>
+              </div>
+            </div>
+          </i-col>
+          <i-col span="21" style="height:100%;">
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+            <!-- 星期 -->
+            <div class="time-box" style="height:100%;">
+              <div class="title-box">
+                <div class="day-box">星期天</div>
+                <div class="day-box">星期一</div>
+                <div class="day-box">星期二</div>
+                <div class="day-box">星期三</div>
+                <div class="day-box">星期四</div>
+                <div class="day-box">星期五</div>
+                <div class="day-box">星期六</div>
+              </div>
+              <div class="detail-box">
+                <div class="null-box" v-for="i in list">
+                  <div class="content" v-if="i.Day">
+                    <div class="day-box">
+                      <p>{{i.Day}}</p>
+                    </div>
+                    <div class="down-box" v-if="i.ShiftsName && i.ShiftID == 0">
+                      <p>{{i.ShiftsName}}</p>
+                    </div>
+                    <div class="down-box" v-if="i.ShiftsName && i.ShiftID == 1" style="background: rgb(252, 184, 38);">
+                      <p>{{i.ShiftsName}}</p>
+                    </div>
+                    <div class="down-box" v-if="i.ShiftsName && i.ShiftID == 2" style="background: rgb(43, 191, 217);">
+                      <p>{{i.ShiftsName}}</p>
+                    </div>
+                    <div class="down-box" style="background: rgb(251, 84, 39);" v-else>
+                      <p>未排班</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- ** -->
+          </i-col>
+        </Row>
+      </div>
+    </div>
+</template>
+<script>
+    import api from '@/api/index.js'
+    import storejs from 'storejs'
+    import { mapState } from 'vuex'
+    import moment from "moment"
+    export default{
+        data () {
+            return {
+              tableLoading: true,
+              humanList: [],
+              storeName: '滨江龙湖天街店',
+              tableHeight: 300,
+              list: [],
+              beauticianIndex: 0,
+              formItem: {
+                Date: new Date()
+              }
+            }
+        },
+        methods: {
+          chooseBeautician (index) {
+            let that = this
+            that.beauticianIndex = index
+            let data = {
+              employeeID: this.humanList[index].EmployeeID,
+              date: moment(this.formItem.Date).format('YYYY-MM')
+            }
+            that.tableLoading = true
+            api.getCurrentSch(data).then((response) => {
+              if (response.error_code === 'Success') {
+                that.getList(response.data.list)
+              } else {
+                this.$Message.error(response.error_message)
+              }
+            })
+          },
+          // 查看排班列表
+          seeHuman () {
+            let data = {
+              employeeID: this.userMes.EmployeeID,
+              date: moment(this.formItem.Date).format('YYYY-MM')
+            }
+            api.getSeeHuman(data).then((response) => {
+              if (response.error_code === 'Success') {
+                this.humanList = response.data.list
+                this.chooseBeautician(0)
+              } else {
+                this.$Message.error(response.error_message)
+              }
+            })
+          },
+          getList (res) {
+            let that = this
+            let dayList = [31,31,28,31,30,31,30,31,31,30,31,30,31]
+            // 接收月份数据 渲染
+            // 五月
+            let date  = moment(this.formItem.Date).format('YYYY-MM')
+            let mon = new Date(date).getMonth() + 1
+            date += '-01'
+            // 星期
+            date = new Date(date).getDay()
+            // 计算头
+            let data = {
+              Day: '',
+              classes: ''
+            }
+            that.list = []
+            // 补全头部
+            for (let i = 0; i < date; i++) {
+              that.list.push(data)
+            }
+            // 补全当前
+            let nowMonList = []
+            for (let i = 1; i <= dayList[mon]; i++) {
+              let nowDay = {
+                Day: i
+              }
+              nowMonList.push(nowDay)
+            }
+            for (let i in res) {
+              let id = res[i].Day
+              for (let j in nowMonList) {
+                if (nowMonList[j].Day == id) {
+                  nowMonList[j] = {
+                    Day: res[i].Day,
+                    DayID: res[i].DayID,
+                    ShiftID: res[i].ShiftID,
+                    ShiftsName: res[i].ShiftsName
+                  }
+                }
+              }
+            }
+            for (let i of nowMonList) {
+              that.list.push(i)
+            }
+            let endLength = 42 - that.list.length
+            for (let i = 0; i < endLength; i++) {
+              that.list.push(data)
+            }
+            setTimeout(() => {
+              that.tableLoading = false
+            }, 300)
+          },
+        },
+        computed: {
+          ...mapState({
+            userMes: state => state.app.userMes,
+            authorList: state => state.app.authorList,
+            tableRows: state => state.app.tableRows
+          }),
+          setAuthor () {
+            let that = this
+            let pageName = that.$route.name
+            let list = that.authorList[pageName]
+            if (list) {
+              for (let i of list) {
+                if (i.Name === '浏览') {
+                  return i.IsVisible
+                }
+              }
+            }
+            return false
+          }
+        },
+        mounted () {
+          let that = this
+          that.$nextTick(() => {
+            that.seeHuman()
+            that.getList()
+          })
+        }
+    }
+</script>
+<style>
+  .employeeScheduling-container{
+    padding-top: 100px;
+    padding-bottom: 20px;
+  }
+  .employeeScheduling-container .tips-box {
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    margin-top: 16px;
+    height: 20px;
+    line-height: 20px;
+  }
+  .employeeScheduling-container .tips-box>div{
+    float: right;
+    width: 3.2%;
+    overflow:hidden;
+  }
+  .employeeScheduling-container .tips-box>.tips{
+  }
+  .employeeScheduling-container .tips-box .dot{
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: green;
+    margin-right: 4px;
+    float: left;
+  }
+  .employeeScheduling-container .beautician-list{
+    position: relative;
+  }
+  .employeeScheduling-container .storeName{
+    position: absolute;
+    top: 0;
+    padding: 8px;
+    background: #8ab95d;
+    color: #fff;
+  }
+  .employeeScheduling-container .beautician-item{
+    position:relative;
+    width:92%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:60px;
+    border-bottom:1px solid #f6f6f6;
+    margin:16px auto 0 auto;
+    box-shadow: 0px 0px 6px rgba(0,0,0,.14);
+    padding-right:6px;
+    border-radius:4px;
+    overflow:hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.employeeScheduling-container .beautician-item:first-child{
+  margin-top: 5px;
+}
+.employeeScheduling-container .beautician-item:hover{
+    border-bottom:1px solid #f6f6f6;
+    color: #8cce4a;
+}
+.employeeScheduling-container .beautician-item:after{
+    content: "";
+    position: absolute;
+    width: 4px;
+    height: 100%;
+    top: 0;
+    right: 0;
+    background: #666666;
+    transition: all 0.2s;
+}
+.employeeScheduling-container .beautician-item.active:after{
+    background: #8cce4a;
+}
+.employeeScheduling-container .beautician-timer{
+    width:100%;
+    height:100%;
+    padding-top:60px;
+}
+.employeeScheduling-container .beautician-timer .title-box{
+    height:47px;
+    line-height:47px;
+    position:absolute;
+    top:0;
+    text-align:center;
+    width:100%;
+    border-bottom:1px solid #f6f6f6;
+}
+.employeeScheduling-container .beautician-timer .content{
+    padding:0 10px;
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+}
+.employeeScheduling-container .beautician-timer .item{
+    display:flex;
+    align-items:center;
+    width:25%;
+    margin-bottom:36px;
+    cursor: pointer;
+}
+.employeeScheduling-container .beautician-timer .item{
+    color: rgb(102, 102, 102);
+    font-size: 12px;
+}
+.employeeScheduling-container .beautician-timer i{
+    font-size: 18px;
+    margin-right:6px;
+}
+.employeeScheduling-container .beautician-timer .item:hover{
+    color: #8cce4a;
+}
+.employeeScheduling-container .beautician-timer .item.disable .text{
+    color: #999;
+    text-decoration:line-through;
+}
+.employeeScheduling-container .beautician-timer .item.disable:hover{
+    color: #999;
+}
+#tableBox{
+  box-shadow: 0px 0px 4px rgba(0,0,0,0.03);
+  border:1px solid #f6f6f6;
+  border-radius: 5px;
+  padding: 15px;
+}
+.time-box{
+  padding: 80px 20px 20px 20px;
+}
+.time-box .title-box{
+  position: absolute;
+  top: 0;
+  width: 100%;
+  left: 0;
+  height: 80px;
+  padding: 0 1%;
+  display: flex;
+  text-align: center;
+  color: #8cce4a;
+  font-size: 14px;
+  background: #fff;
+  justify-content: space-around;
+  align-items: center;
+}
+.time-box .title-box .day-box{
+  width: 13%;
+  height: 50px;
+  border:1px solid #f6f6f6;
+  line-height: 50px;
+  box-shadow: 0 0 4px rgba(0,0,0,.2)
+}
+.detail-box{
+  position: relative;
+  background: #f8f8f8;
+  height: 100%;
+  display:flex;
+  flex-wrap:wrap;
+}
+.null-box{
+  width:14.28%;
+  border-right:1px solid #f0f0f0;
+  border-bottom:1px solid #f0f0f0;
+  height:70px;
+  height:16.66%;
+  padding: 5px;
+  box-sizing:border-box;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content: center;
+  align-items: center;
+}
+.employeeScheduling-container .content{
+  background: #fff;
+  border-radius: 4px;
+  width: 100%;
+  overflow: hidden;
+  height: 100%;
+  box-shadow: 0 0 4px rgba(0,0,0,.2);
+}
+/*晚班*/
+.content.night>.down-box{
+  background: #fcb827;
+}
+/*休息*/
+.content.reset>.down-box{
+  background: #2cc0da;
+}
+/*未排班*/
+.content.non>.down-box{
+  background: #fc5427;
+}
+
+.content .day-box{
+  text-align: center;
+  height: 60%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  color: #333;
+}
+.content .down-box{
+  width: 100%;
+  height: 40%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #95c666;
+  color: #fff;
+  transition: all 0.2s;
+}
+</style>

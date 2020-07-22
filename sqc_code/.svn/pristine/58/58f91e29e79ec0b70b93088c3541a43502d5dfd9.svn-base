@@ -1,0 +1,512 @@
+<template>
+    <div class="ygbb-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker type="date" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                            
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker type="date" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="18">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="getList">查询</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <!-- 图表 -->
+        <div class="form-box">
+            <!-- 门店业绩来人数据 -->
+            <div class="charts">
+                <div class="header">
+                    门店业绩来人数据
+                </div>
+                <div class="content">
+                    <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+                    <div id="data_source_com" class="forms"></div>
+                </div>
+            </div>
+            <!-- 门店业绩分布数据 -->
+            <div class="charts">
+                <div class="header">
+                    门店业绩分布数据
+                </div>
+                <div class="content">
+                    <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+                    <div id="data_source_fb" class="forms"></div>
+                </div>
+            </div>
+            <div class="charts">
+                <div class="header">
+                    数据总览
+                </div>
+                <div class="no-form">
+                    <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+                    <div class="progress-box">
+                        <div>总业绩</div>
+                        <div>￥{{TotalAmount}}</div>
+                        <Progress :percent="100" hide-info></Progress>
+                        <!-- <Progress :percent="getTotalAmount" hide-info></Progress> -->
+                    </div>
+                    <div class="progress-box">
+                        <div>总来人</div>
+                        <div>{{VisitorNumber}}</div>
+                        <Progress :percent="100" hide-info></Progress>
+                    </div>
+                    <div class="progress-box">
+                        <div>总欠款</div>
+                        <div>￥{{ArrearsAmount}}</div>
+                        <Progress :percent="100" hide-info></Progress>
+                    </div>
+                    <div class="progress-box">
+                        <div>总新客</div>
+                        <div>{{TotalNewCustomerNumber}}</div>
+                        <Progress :percent="100" hide-info></Progress>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 表格 -->
+        <div class="table-box">
+            <div class="header">
+                门店业绩来人数据
+            </div>
+            <Table :columns="columns1" :data="list" highlight-row stripe :loading="tableLoading"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+    </div>
+</template>
+<script>
+    import moment from 'moment'
+    import { mapState } from 'vuex'
+    import api from '@/api/index.js'
+    import echarts from 'echarts'
+    export default{
+        data () {
+            return {
+                TotalAmount: 199999,
+                VisitorNumber: 199999,
+                ArrearsAmount: 199999,
+                TotalNewCustomerNumber: 0,
+                spinShow: true,
+                tablePage: {
+                    page: 1,
+                    pageNum: 10,
+                    maxPageNum: 100,
+                    allNum: 199,
+                    startNum: 0,
+                    endNum: 0
+                },
+                tableLoading: false,
+                modal1: false,
+                formItem: {
+                    startDate: new Date(),
+                    endDate: new Date(),
+                    EmployeeID: ''
+                },
+                columns1: [
+                    {
+                        title: '门店',
+                        key: 'StoreName',
+                        align: 'center'
+                    }, {
+                        title: '总来人',
+                        key: 'VisitorNumber',
+                        align: 'center'
+                    }, {
+                        title: '总新客',
+                        key: 'TotalNewCustomerNumber',
+                        align: 'center'
+                    }, {
+                        title: '总业绩',
+                        key: 'TotalAmount',
+                        align: 'center'
+                    }, {
+                        title: '总欠款',
+                        key: 'ArrearsAmount',
+                        align: 'center'
+                    }, {
+                        title: '执行总额',
+                        key: 'ExecuteAmount',
+                        align: 'center'
+                    }, 
+                    // {
+                    //     title: '操作',
+                    //     key: 'cz',
+                    //     align: 'center',
+                    //     render: (h, parmas) => {
+                    //         let that = this
+                    //         return h('i', {
+                    //             class: {
+                    //                 'ivu-icon': true,
+                    //                 'ivu-icon-aaa-chakanxiangqing': true,
+                    //                 'icon-btn': true
+                    //             },
+                    //             on: {
+                    //                 click: () => {
+                    //                     // this.checkBillStatus(parmas.row)
+                    //                 }
+                    //             }
+                    //         })
+                    //     }
+                    // },
+                     {
+                        title: ' ',
+                        width: 10
+                    }
+                ],
+                list: []
+            }
+        },
+        computed: {
+            ...mapState({
+                userMes: state => state.app.userMes,
+                authorList: state => state.app.authorList,
+                tableRows: state => state.app.tableRows
+            }),
+            setTableHeight () {
+                let h = 440
+                if (window.innerHeight > 900) {
+                    h = 540
+                }
+                return h / 768 * window.innerHeight
+            },
+            setAuthor () {
+                // 判断用户是否有查看客户详情权限
+                let that = this
+                let pageName = that.$route.name
+                let list = that.authorList[pageName]
+                if (list) {
+                    for (let i of list) {
+                        if (i.Name === '增加') {
+                            return i.IsVisible
+                            break
+                        }
+                    }
+                } else {
+                    return false
+                }
+            }
+        },
+        methods: {
+            searchList () {
+                let that = this
+                if (that.formItem.startDate && that.formItem.endDate) {
+                    // 两者同时存在
+                    if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+                        that.$Message.error('开始日期不得大于结束日期')
+                        return false
+                    }
+                }
+                that.getList()
+            },
+            resetSearch () {
+                let that = this
+                that.$refs.searchForm.resetFields()
+                that.getList()
+            },
+            setEcharts (pieData, barData, barName) {
+                let that = this
+                that.$nextTick(() => {
+                    var dataSourcePie = echarts.init(document.getElementById('data_source_com'));
+                    var dataSourceBar = echarts.init(document.getElementById('data_source_fb'));
+                    let optionPie = {
+                        color: ['#60d388', '#8378ea', '#e7bcf3', '#fb7293', '#e25c2f', '#ff9f7f', '#ffdb5c', '#9fe6b8', '#5fd1dd', '#37a2da', '#d94e81'],
+                         tooltip : {
+                            trigger: 'item',
+                            formatter: "{a} {b} : {c} (人)"
+                        },
+                        xAxis: {
+                            // name: '店铺名称',
+                            type: 'category',
+                            axisLine: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    color: '#999',
+                                    width: '1'
+                                }
+                            },
+                            data: []
+                        },
+                        yAxis: {
+                            // name: '成交量',  
+                            axisLine: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    color: '#999',
+                                    width: '1'
+                                }
+                            },
+                            axisLabel: {
+                                textStyle: {
+                                    color: '#333'
+                                }
+                            },
+                            type: 'value'
+                        },
+                        grid: {
+                            width:'66%',
+                            left: '17%',
+                            height:'50%',
+
+                        },
+                        legend: {
+                            data:barName,
+                            width: '100%',
+                            bottom:15
+                        },
+                        series: pieData
+                    };
+                    const optionBar = {
+                        color: ['#60d388', '#8378ea', '#e7bcf3', '#fb7293', '#e25c2f', '#ff9f7f', '#ffdb5c', '#9fe6b8', '#5fd1dd', '#37a2da', '#d94e81'],
+                        tooltip: {},
+                        xAxis: {
+                            // name: '店铺名称',
+                            type: 'category',
+                            axisLine: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    color: '#999',
+                                    width: '1'
+                                }
+                            },
+                            data: []
+                        },
+                        yAxis: {
+                            // name: '成交量',  
+                            axisLine: {
+                                lineStyle: {
+                                    type: 'solid',
+                                    color: '#999',
+                                    width: '1'
+                                }
+                            },
+                            axisLabel: {
+                                textStyle: {
+                                    color: '#333'
+                                }
+                            },
+                            type: 'value'
+                        },
+                        grid: {
+                            width:'66%',
+                            left: '17%',
+                            height:'50%'
+
+                        },
+                        legend: {
+                            data:barName,
+                            width: '90%',
+                            bottom:20
+                        },
+                        series: barData
+                    }
+                    dataSourcePie.setOption(optionPie);
+                    dataSourceBar.setOption(optionBar);
+                    that.spinShow = false
+                    window.addEventListener('resize', function () {
+                        dataSourcePie.resize();
+                        dataSourceBar.resize();
+                    });
+                });
+            },
+            getList () {
+                let that = this
+                let data = {
+                    StartDate: that.formItem.startDate,
+                    EndDate: that.formItem.endDate,
+                    EmployeeID: that.userMes.EmployeeID
+                }
+                if (data.StartDate) {
+                    data.StartDate = moment(data.StartDate).format('YYYY-MM-DD')
+                }
+                if (data.EndDate) {
+                    data.EndDate = moment(data.EndDate).format('YYYY-MM-DD')
+                }
+                that.tableLoading = true
+                that.spinShow = true
+                api.getOperationalDataPlatform(data).then((response) => {
+                    console.log(response.data)
+                    that.tableLoading = false
+                    if (response.error_code === 'Success') {
+                        // console.log(response.data.VistorNumber)
+                        that.TotalAmount = response.data.TotalAmount
+                        that.ArrearsAmount = response.data.ArrearsAmount
+                        that.VisitorNumber = response.data.VistorNumber
+                        that.TotalNewCustomerNumber = response.data.TotalNewCustomerNumber
+                        that.list = response.data.list
+                        that.setPieData()
+                    } else {
+                        that.$Message.error(response.error_message)
+                    }
+                })
+            },
+            setPieData () {
+                let that = this
+                let pieData = []
+                let barData = []
+                let barName = []
+                let colorList = ['#60d388', '#8378ea', '#e7bcf3', '#fb7293', '#e25c2f', '#ff9f7f', '#ffdb5c', '#9fe6b8', '#5fd1dd', '#37a2da', '#d94e81']
+                for (let i in that.list) {
+                    // 柱状图(人)
+                    let a = {
+                        data: [],
+                        name: that.list[i].StoreName,
+                        type: 'bar'
+                    }
+                    a.data.push(that.list[i].VisitorNumber)
+                    pieData.push(a)
+                    // 柱状图
+                    let b = {
+                        data: [],
+                        name: that.list[i].StoreName,
+                        type: 'bar'
+                    }
+                    b.data.push(that.list[i].TotalAmount)
+                    // console.log(that.list[i].StoreName, that.list[i])
+                    // b.data.push(that.list[i].TotalAmount > 0 ? that.list[i].TotalAmount : Math.random() * 42200 + 52200)
+                    barName.push(that.list[i].StoreName)
+                    barData.push(b)
+                }
+                // console.log('barData', barData)
+                that.setEcharts(pieData, barData, barName)
+            }
+        },
+        mounted () {
+            let that = this
+            that.getList()
+            // that.setAuthor
+        }
+    }
+</script>
+<style>
+    .ygbb-container {
+        width: 100%;
+        position: relative;
+        padding: 72px 0px;
+        background: #F0F0F0;
+        border-radius: 0;
+        overflow: visible !important;
+    }
+    .ygbb-container .search-box{
+        border-radius: 5px;
+        background: #fff;
+        padding: 10px 20px;
+    }
+    .ygbb-container .header{
+        position: absolute;
+        padding-left: 22px;
+        font-size: 14px;
+        height: 40px;
+        line-height: 40px;
+        top: 0;
+        width: 100%;
+        left: 0;
+    }
+    .ygbb-container .header:before{
+        content: "";
+        position: absolute;
+        width: 2px;
+        height: 15px;
+        top: 50%;
+        margin-top: -7.5px;
+        left: 10px;
+        background: #79aa49;
+    }
+    .ygbb-container .header:after{
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 1px;
+        background: #79aa49;
+        left: 0;
+        bottom: 0;
+    }
+    .ygbb-container .form-box{
+        background: #F0F0F0;
+        height: 480px;
+        padding-top: 11px;
+        padding-bottom:11px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-sizing: border-box;
+    }
+    .ygbb-container .form-box>.charts{
+        position: relative;
+        background: #fff;
+        border-radius: 8px;
+        width: 20%;
+        padding-top: 40px;
+        height: 100%;
+        flex: 1;
+        margin-right: 30px;
+    }
+    .ygbb-container .form-box .content{
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+    .ygbb-container .form-box>.charts:first-child{
+        flex:5;
+    }
+    .ygbb-container .form-box>.charts:nth-child(2){
+        flex: 6;
+    }
+    .ygbb-container .form-box>.charts:nth-child(3) {
+        margin-right: 0;
+    }
+    .ygbb-container #data_source_com,
+    .ygbb-container #data_source_fb{
+        height: 100%;
+        width: 100%;
+    }
+    .ygbb-container .form-box .charts .no-form{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction:column;
+        padding: 0 5%;
+        height: 100%;
+    }
+    .ygbb-container .form-box .charts .progress-box{
+        width: 100%;
+        margin-bottom: 8px;
+    }
+    .ygbb-container .table-box{
+        position: relative;
+        padding: 60px 20px;
+        border-radius: 8px;
+        background: #fff;
+        height: auto !important;
+        box-sizing: border-box;
+        margin-bottom: 40px;
+    }
+    .ygbb-container .form-box .charts .no-form .progress-box >div:nth-child(1) {
+        color: #333333;
+        font-size: 14px;
+    }
+    .ygbb-container .form-box .charts .no-form .progress-box >div:nth-child(2) {
+        color: #666666;
+        font-size: 14px;
+    }
+    .ygbb-container .form-box .charts .no-form .progress-box:nth-child(1) .ivu-progress-bg {
+        background-color: #fcc522;
+    }
+    .ygbb-container .form-box .charts .no-form .progress-box:nth-child(2) .ivu-progress-bg {
+        background-color: #7db14a;
+    }
+    .ygbb-container .form-box .charts .no-form .progress-box:nth-child(3) .ivu-progress-bg {
+        background-color: #d94e81;
+    }
+</style>
+

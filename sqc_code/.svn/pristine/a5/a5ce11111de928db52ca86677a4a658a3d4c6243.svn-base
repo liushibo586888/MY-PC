@@ -1,0 +1,196 @@
+<!-- 新客到店项目分类占比 -->
+<template>
+  <div class="jyshD-container container">
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          新客到店项目分类占比
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+export default {
+  props: ["startDate", "endDate", "storeID"],
+  data() {
+    return {
+      spinShow: true
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    setEcharts(pieData, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: ["#3398DB"],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              // 坐标轴指示器，坐标轴触发有效
+              type: "shadow" // 默认为直线，可选为：'line' | 'shadow'
+            }
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            containLabel: true
+          },
+          xAxis: [
+            {
+              type: "category",
+              data: barName,
+              axisLabel: echartsCommon.axisLabel(),
+              axisTick: {
+                alignWithLabel: true
+              }
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+              // axisLabel: {
+              //   formatter: "{value} %" //Y轴加单位
+              // }
+            }
+          ],
+          series: [
+            {
+              name: "该项占比",
+              type: "bar",
+              barWidth: "60%",
+              data: pieData,
+              itemStyle: {
+                normal: {
+                  label: {
+                    show: true, //开启显示
+                    position: "top", //在上方显示
+                    formatter: "{c}%",//在上方显示单位
+                    textStyle: {
+                      //数值样式
+                      color: "black",
+                      fontSize: 10
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        };
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StartDate: that.startDate,
+          EndDate: that.endDate,
+          StoreId: that.storeID,
+          ReportType: 1,
+          EmployeeId: that.userMes.EmployeeID,
+          AreaId: ""
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        }
+        that.tableLoading = true;
+        that.spinShow = true;
+        api.NewConsumeChannelInfoReport(data).then(response => {
+          that.tableLoading = false;
+          if (response.error_code === "Success") {
+            that.list = response.data;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    setPieData() {
+      let that = this;
+      let pieData = [];
+      let barName = [];
+      for (let i in that.list) {
+        // 饼图
+        let a = {
+          value: that.list[i].Rate.toFixed(2),
+          name: that.list[i].CateType
+        };
+        pieData.push(a.value);
+        barName.push(a.name);
+      }
+      that.setEcharts(pieData, barName);
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+  },
+  watch: {
+    startDate(val, oldVal) {
+      this.getList();
+    },
+    endDate(val1, oldVal1) {
+      this.getList();
+    },
+    storeID(val2, oldVal2) {
+      this.getList();
+    }
+  }
+};
+</script>
+<style>
+</style>
+

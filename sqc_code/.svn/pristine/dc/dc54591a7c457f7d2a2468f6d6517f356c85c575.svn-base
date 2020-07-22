@@ -1,0 +1,951 @@
+<template>
+    <div class="xmqz-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userName">
+                            <Input v-model="formItem.userName" placeholder="入库单号"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="15">
+                        <formItem class="btn-box">
+                            <i-button type="primary" class="btn" @click="searchForm">搜索</i-button>
+                            <i-button type="warning" class="btn" @click="resetSearch">重置</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="addMode()" v-if="showEdit">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="changeMode()" v-if="showEdit">浏览</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="chooseRow"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+        <!-- 弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" width="1000" :scrollable="true" class="dialog" v-if="showAdd || showEdit">
+            <div slot='header' class="header not-print">
+                新增入库单
+            </div>
+            <div slot='close' class="close not-print">
+                <i class='ivu-icon ivu-icon-aaa-guanbi' @click="resetForm"></i>
+            </div>
+            <!-- 用户信息部分 不可修改 -->
+            <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+                <row type="flex" justify="space-between">
+                    <i-col span="6">
+                        <FormItem prop="OrderNum" label="入库单编号：">
+                            <Input v-model="formValidate.OrderNum" placeholder="可不填,自动生成" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem prop="OutType" label="入库单类型：">
+                            <Select v-model="formValidate.OutType" :filterable="true" placeholder="请选择">
+                                <Option :value="item.ID" v-for="(item, index) in mrsList" :key="index" @click.native="chooseBeautician(item.Name,item.ID)">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="关联订单号：" prop="ContractOrder">
+                            <Input v-model="formValidate.ContractOrder" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="制单人：" prop="CustomerSex">
+                            <Input v-model="formValidate.CustomerSex" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="6">
+                        <FormItem label="供应商编号：" prop="CashBalance">
+                            <Input v-model="formValidate.CashBalance" placeholder="无" style="width:100%;"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="供应商名称：" prop="IntegrationBalance">
+                            <Input v-model="formValidate.IntegrationBalance" placeholder="无" style="width:100%;"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="供应商联系人：" prop="ArrearsBalance">
+                            <Input v-model="formValidate.ArrearsBalance" placeholder="无" style="width:100%;"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="供应商联系方式：" prop="HandselBalance">
+                            <Input v-model="formValidate.HandselBalance" placeholder="无" style="width:100%;"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex">
+                    <i-col span="6">
+                        <FormItem label="制单时间：" prop="SceneEmployeeName">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="选择库位：" prop="BeauticianID" :rules="formValidateRule.BeauticianID">
+                            <Select v-model="formValidate.BeauticianID" :filterable="true" placeholder="请选择">
+                                <Option :value="item.ID" v-for="(item, index) in mrsList" :key="index" @click.native="chooseBeautician(item.Name,item.ID)">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+
+                    </i-col>
+                </row>
+                <!-- ** -->
+            </Form>
+            <!-- 物资明细 -->
+            <div class="pannel-title">
+                <p>物资列表</p>
+                <div>
+                    <i-button type="text" @click="showSmallModal(0)" size="small" style="width: auto; height: auto;">添加物资</i-button>
+                </div>
+            </div>
+            <!-- 添加、修改 -->
+            <div class="table-box" style="margin-top:0; margin-bottom:20px;">
+                <i-table stripe :columns="choosedItemColumns" :data="choosedItemList" :height="300"></i-table>
+            </div>
+            <row type="flex" justify="end" style="margin-bottom: 20px; color: #fc5427; font-size: 14px; font-weight: bold;">
+            </row>
+            <Input v-model="formValidate.Remark" placeholder="备注" type="textarea" :rows="4"></Input> 
+            <!-- ** -->
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="addForm" :loading="onLoading" :disabled="stopuse">保存</Button>
+                <Button class="btn" type="warning" @click="resetForm" :loading="onLoading">取消</Button>
+            </div>
+        </Modal>
+        <!-- 物资弹窗 -->
+        <Modal :mask-closable="false" v-model="modal2" width="800" class="dialog" v-if="showAdd || showEdit">
+            <div slot='header' class="header not-print">
+                入库产品
+            </div>
+            <div slot='close' class="close not-print">
+                <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+            </div>
+            <Input v-model="searchKeyWord" placeholder="请输入项目名称" style="width: 300px; margin: 2px 0 2px 0;" icon="search"></Input>
+            <div class="table-box">
+                <!-- 物资 -->
+                <i-table stripe :columns="materialsColumn" :data="setMaterialtData" @on-selection-change="selectMaterial" :height="500"></i-table>
+            </div>
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="smalladdForm" :loading="onLoading">保存</Button>
+                <Button class="btn" type="warning" @click="smallResetForm" :loading="onLoading">取消</Button>
+            </div>
+        </Modal>
+    </div>
+</template>
+<script>
+const Decimal = require("decimal");
+import Vue from "vue";
+import storejs from "storejs";
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      stopuse: false,
+      calSum: 0,
+      mode: 0, // 0增加 1修改  2浏览
+      showEdit: true,
+      showAdd: false,
+      showLook: false,
+      modalTitle: "修改",
+      currentID: null,
+      searchKeyWord: "",
+      // 确诊单ID
+      DetailId: "",
+      onLoading: false,
+
+      rowID: "",
+      rowStatus: "",
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0,
+        row: 10
+      },
+      tableHeight: 200,
+      tableLoading: false,
+      onPrint: false,
+      number: true,
+      delPoup: false,
+      modal1: false,
+      modal2: false,
+      formValidate: {
+        BeauticianID: "",
+        OutType: "",
+        OrderNum: "",
+        ContractOrder: "",
+        CustomerSex: "",
+        TMKEMployeeName: "",
+        Nurse: "",
+        SceneEmployeeName: "",
+        ArrearsBalance: "",
+        HandselBalance: "",
+        CashBalance: "",
+        IntegrationBalance: "",
+        Remark: ""
+      },
+      formValidateRule: {
+        BeauticianID: {
+          required: true,
+          message: "美容师不得为空",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        userName: ""
+      },
+      // 主表格行
+      columns1: [
+        {
+          title: "入库单号",
+          key: "OrderNum",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "入库类型",
+          key: "OutType",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "供应商",
+          key: "CusName",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "关联订单",
+          key: "ContractOrder",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "货品总数",
+          key: "Num",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "总金额",
+          key: "Amount",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "状态",
+          key: "Reason",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "制单人",
+          key: "CreateUser",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "创建时间",
+          key: "CreateTime",
+          align: "center",
+          width: 150,
+          render: (h, params) => {
+            if (!params.row.CreateTime) {
+              return h("div", {}, "");
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.CreateTime).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      mrsList: [],
+      alreadyPaid: false,
+      selection: [],
+      xmData: [],
+      wzData: [],
+      volumeTypes: [],
+      projectTypeList: [],
+      materialsColumn: [
+        {
+          type: "selection",
+          width: 80
+        },
+        {
+          title: "产品名称",
+          key: "Name",
+          align: "center"
+        },
+        {
+          title: "产品条码",
+          key: "SimpleCode",
+          align: "center"
+        },
+        {
+          title: "批次",
+          key: "Standard",
+          align: "center"
+        },
+        {
+          title: "库位",
+          key: "Unit",
+          align: "center"
+        },
+        {
+          title: "现有库存",
+          key: "Unit",
+          align: "center"
+        }
+      ],
+      materialsData: [],
+      projectListData: [],
+      HandleList: [],
+      myPaymentMode: [],
+      choosedItemColumns: [
+        {
+          title: "产品名称",
+          key: "projectName",
+          align: "center",
+          width: 150
+        },
+        {
+          title: "产品条码",
+          key: "gg",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "产品编号",
+          key: "gg",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "批次",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "单价",
+          key: "price",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "出库数",
+          key: "num",
+          align: "center",
+          width: 100,
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写数量",
+                  value: params.row.num,
+                  max: 9999999,
+                  min: 1
+                },
+                on: {
+                  "on-change": function(e) {
+                    that.$nextTick(() => {
+                      params.row.num = e;
+                      let nRate = that.formatData(
+                        Decimal.div(params.row.rate, 100).toNumber()
+                      );
+                      params.row.sum = that.formatData(
+                        params.row.price * params.row.num * nRate
+                      );
+                      that.choosedItemList[params.index] = params.row;
+                      that.calSumMoney();
+                    });
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "总价",
+          key: "sum",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "规格",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "库位",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "操作",
+          key: "action",
+          align: "center",
+          width: 80,
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                style: {},
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.index);
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      choosedItemList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    },
+    setMaterialtData() {
+      // 过滤物资列表
+      let that = this;
+      let arr = [];
+      let idList = [];
+      let keyWord = that.searchKeyWord;
+      // 选中的商品不会出现在待选列表中
+      for (let i of that.choosedItemList) {
+          idList.push(i.id);
+      }
+      for (let i of that.materialsData) {
+          console.log(i.Name.indexOf('测试'));
+        if (idList.indexOf(i.ID) <= -1) {
+          // 搜索
+          if (
+            i.Name.indexOf(keyWord) > -1 ||i.SimpleCode.indexOf(keyWord) > -1) {
+            arr.push(i);
+          }
+        }
+      }
+      return arr;
+    },
+    setSmallModalTitle() {
+      let that = this;
+      return "物资";
+    }
+  },
+  methods: {
+    changeMode() {
+      let that = this;
+      that.stopuse = true;
+      // 修改
+      if (!that.currentID) {
+        that.$Message.error("请选择一条订单");
+        return false;
+      }
+      that.modal1 = true;
+      that.getProjectList();
+      that.getDetail(that.currentID);
+    },
+    addMode() {
+      let that = this;
+      that.modal1 = true;
+      that.stopuse = false;
+      // 添加
+      that.getProjectList();
+    },
+    chooseBeautician(name, id) {
+      this.formValidate.BeauticianID = id;
+      console.log(this.formValidate.BeauticianID);
+    },
+    getProjectList() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      // console.log(data);
+      api.getBeauticiansByEmployeeID(data).then(response => {
+        console.log(response.data);
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.mrsList = res.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    chooseRow(row) {
+      // 选中某一行修改
+      let that = this;
+      that.currentID = row.ID;
+      that.rowStatus = row.StatusText;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.BeauticianID = res.BeauticianID;
+      that.formValidate.OrderNum = res.Name;
+      that.formValidate.ContractOrder = res.Age;
+      that.formValidate.OutType = res.Phone;
+      that.formValidate.CustomerSex = res.Sex;
+      that.formValidate.TMKEmployeeName = res.TMKEmployeeName;
+      that.formValidate.Nurse = res.Nurse;
+      that.formValidate.SceneEmployeeName = res.SceneEmployeeName;
+      that.formValidate.ArrearsBalance = Number(res.ArrearsBalance);
+      that.formValidate.HandselBalance = Number(res.HandselBalance);
+      that.formValidate.CashBalance = Number(res.CashBalance);
+      that.formValidate.IntegrationBalance = Number(res.IntegrationBalance);
+    },
+    showDelDetailPoup(index) {
+      let that = this;
+      that.choosedItemList.splice(index, 1);
+      that.calSumMoney();
+    },
+    resetForm() {
+      let that = this;
+
+      that.choosedItemList = [];
+      that.DetailId = "";
+      that.formValidate.Remark = "";
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    getDetail(id) {
+      // 获取确诊单明细
+      let that = this;
+      that.$store.commit("changeLoadingPage");
+      api.getConsumptions(id).then(response => {
+        console.log(response.data);
+
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          // 设置数据
+          that.setDetail(response.data);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setDetail(res) {
+      // 获取确诊详情并设置数据
+      let that = this;
+      that.choosedItemList = [];
+      that.formValidate.CustomerID = res.CustomerID;
+      that.setData(res);
+      that.formValidate.Remark = res.Remark;
+      that.DetailId = res.ID;
+      for (let i in res.ConsumptionDetails) {
+        let dom = res.ConsumptionDetails[i];
+        let a = {
+          id: "",
+          sum: Number(dom.Amount.toFixed(2)),
+          rate: dom.Sconto,
+          num: dom.Quantity,
+          price: dom.Price,
+          oldPrice: dom.Price,
+          lowPrice: dom.MinPrice,
+          highPrice: dom.MaxPirce,
+          gg: dom.Standard,
+          projectName: dom.Name,
+          type: ""
+        };
+        if (dom.ItemID) {
+          // 项目
+          a.id = dom.ItemID;
+          a.type = "xm";
+          // that.xmData.push(a)
+        } else {
+          // 物资
+          a.id = dom.GoodsID;
+          a.type = "wz";
+          // that.wzData.push(a)
+        }
+        that.choosedItemList.push(a);
+      }
+      that.modal1 = true;
+      that.calSumMoney();
+    },
+    setUploadData() {
+      // 设置提交数据
+      let that = this;
+      let data = {
+        CustomerID: that.formValidate.CustomerID,
+        RegistBy: that.userMes.EmployeeID,
+        ConsumptionTotal: 0,
+        BeauticianID: that.formValidate.BeauticianID,
+        Remark: that.formValidate.Remark,
+        ConsumptionDetails: []
+      };
+      // 添加物资记录
+      for (let i of that.choosedItemList) {
+        data.ConsumptionTotal += i.sum;
+        let a = {
+          Price: Number(i.price),
+          Quantity: i.num,
+          Sconto: i.rate,
+          Amount: Number(i.sum),
+          Remark: ""
+        };
+        a.GoodsID = i.id;
+        data.ConsumptionDetails.push(a);
+      }
+      data.ConsumptionTotal = that.formatData(data.ConsumptionTotal);
+      data.BeauticianID = that.formValidate.BeauticianID;
+      return data;
+    },
+    addForm() {
+      let that = this;
+      if (that.choosedItemList.length <= 0) {
+        that.$Message.error("请选择物资");
+        return false;
+      }
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          if (that.choosedItemList.length <= 0) {
+            that.$Message.error("请选择物资");
+            return false;
+          }
+          that.onLoading = true;
+          if (that.DetailId) {
+            // 有确诊单ID调用修改接口
+            that.modifyForm(); //修改按钮
+            return false;
+          }
+          api.consumptions(that.setUploadData()).then(response => {
+            that.onLoading = false;
+            if (response.error_code === "Success") {
+              that.$Message.success("提交成功");
+              that.resetForm();
+              that.getList();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          that.$Message.error("请选择开单人");
+        }
+      });
+    },
+    // modifyForm() {//修改按钮
+    //   let that = this;
+    //   api
+    //     .modiefyConsumptions(that.DetailId, that.setUploadData())
+    //     .then(response => {
+    //       that.onLoading = false;
+    //       if (response.error_code === "Success") {
+    //         that.$Message.success("修改成功");
+    //         that.$refs.formValidate1.resetFields();
+    //         that.wzData = [];
+    //         that.xmData = [];
+    //         that.DetailId = "";
+    //         that.getList();
+    //         that.modal1 = false;
+    //       } else {
+    //         that.$Message.error(response.error_message);
+    //       }
+    //     });
+    // },
+    // 选择物资
+    selectMaterial(selection) {
+      let that = this;
+      // 选中的物资/药物列表
+      that.selection = selection;
+    },
+    smalladdForm() {
+      let that = this;
+      // 选择物资
+      for (let i in that.selection) {
+        let a = {
+          id: that.selection[i].ID,
+          sum: that.selection[i].UnitPrice,
+          rate: 100,
+          price: that.selection[i].UnitPrice,
+          num: 1,
+          gg: that.selection[i].Standard,
+          projectName: that.selection[i].Name,
+          oldPrice: that.selection[i].UnitPrice
+        };
+        that.choosedItemList.push(a);
+      }
+      that.modal2 = false;
+      that.calSumMoney();
+    },
+    smallResetForm() {
+      let that = this;
+      that.modal2 = false;
+    },
+    showSmallModal() {
+      // 展示物资/项目弹窗
+      let that = this;
+
+      that.searchKeyWord = "";
+      that.commit;
+      that.$store.commit("changeLoadingPage");
+
+      that.getSalesGoodsList();
+
+      that.modal2 = true;
+    },
+    showRemark(row) {
+      // 显示备注
+      let that = this;
+      that.$Modal.info({
+        title: "备注详情",
+        content: row.Remark
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      let data = {
+        // EmployeeID: that.userMes.EmployeeID,
+        beginTime: that.formItem.startDate,
+        endTime: that.formItem.endDate,
+        OrderNum: that.formItem.userName,
+        pageindex: that.tablePage.page,
+        pagesize: that.tablePage.pageNum
+      };
+      // 转换日期
+      if (data.beginTime) {
+        data.beginTime = moment(data.beginTime).format("YYYY-MM-DD");
+      }
+      if (data.endTime) {
+        data.endTime = moment(data.endTime).format("YYYY-MM-DD");
+      }
+      //   that.tableLoading = true;
+      //   api.getOutStorageList(data).then(response => {
+      //     if (response.error_code === "Success") {
+      //       console.log(response.list);
+      //       let res = response.data;
+      //       that.list = res.list;
+      //       that.tableLoading = false;
+      //       that.$set(that.tablePage, "page", res.page);
+      //       that.$set(that.tablePage, "pageNum", res.size);
+      //       that.$set(that.tablePage, "allNum", res.total);
+      //       that.$set(that.tablePage, "maxPageNum", res.totalPage);
+      //       that.setPage();
+      //     } else {
+      //       that.$Message.error(response.error_message);
+      //     }
+      //   });
+    },
+    //导出
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    getSalesGoodsList() {
+      // 获取可销售物资列表
+      let that = this;
+      let data = {
+        page: 1,
+        size: 1000
+      };
+      api.getSalesGoods(data).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+            console.log( response.data.list);
+          that.materialsData = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getSalesProjectList() {
+      let that = this;
+      let data = {
+        page: 1,
+        size: 1000
+      };
+      api.getItemsByValid(data).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          that.projectListData = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    calSumMoney() {
+      // 弹窗中计算物资、项目合计金额
+      let that = this;
+      let sum = 0;
+      if (that.choosedItemList.length > 0) {
+        for (let i of that.choosedItemList) {
+          sum += i.sum;
+        }
+      }
+      that.calSum = sum;
+    },
+    formatData(num) {
+      // 四舍五入数据
+      let that = this;
+      let n = parseInt(num * 100 + 0.5) / 100;
+      return n;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      //   that.checkAuthor();
+      that.initTableHeight();
+      that.getList();
+      that.getProjectList();
+      // that.getHandleList()
+    });
+  },
+  filters: {
+    formatMoney(val) {
+      if (!val) {
+        return 0.0;
+      }
+      return Number(val).toFixed(2);
+    }
+  }
+};
+</script>
+<style>
+.dialog .ivu-modal-body {
+}
+
+.pannel-title i:hover {
+  cursor: pointer;
+  color: #94bb6d;
+}
+
+.ivu-select-dropdown {
+  z-index: 99999;
+}
+
+.buttongroup {
+  margin-left: 323px;
+  margin-top: -33px;
+}
+</style>

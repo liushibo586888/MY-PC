@@ -1,0 +1,79 @@
+<template>
+  <div>
+    <div class="ceDiv"></div>
+    <div class="QYjysh-container container">
+
+      <div class="search-box">
+        <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form" v-for="index in list" :key="index">
+          <row :gutter="20">
+            <i-col span="3">
+              <formItem prop="startDate">
+                <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+              </formItem>
+            </i-col>
+            <i-col span="3">
+              <formItem prop="endDate">
+                <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+              </formItem>
+            </i-col>
+            <i-col span="3">
+              <button @click="tianjia">添加</button>
+              <button @click="shanchu(index)">删除</button>
+            </i-col>
+          </row>
+        </Form>
+      </div>
+
+    </div>
+
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echartsCommon from "@/api/Common.js";
+import echarts from "echarts";
+export default {
+  data() {
+    return {
+      list: [1],
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      timeList: echartsCommon.timeList(),
+      spinShow: true,
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        StartDate1: new Date(),
+        EndDate1: new Date(),
+        sCity: "",
+        sCityName: "",
+        time: ""
+      }
+    };
+  },
+  methods: {
+    tianjia() {
+      let that = this;
+      let a = 1;
+      that.list.push(a);
+    },
+    shanchu(index) {
+      let that = this;
+      that.list.splice(index, 1);
+    }
+  }
+};
+</script>
+<style>
+.QYjysh-container .search-boxlll {
+  border-radius: 5px;
+  background: #fff;
+  padding: 10px 20px;
+}
+.ceDiv{
+  width: 300px;
+  height: 500px;
+  border: 1px solid black
+}
+</style>

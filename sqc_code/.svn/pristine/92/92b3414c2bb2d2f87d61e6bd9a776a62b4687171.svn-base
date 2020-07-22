@@ -1,0 +1,51 @@
+var echartsCommon = {};
+echartsCommon.count = 0;
+echartsCommon.defalutList = ['#C1232B', '#B5C334', '#FE8463'];
+echartsCommon.colorList = [];
+echartsCommon.setColor = function () {
+    let count = echartsCommon.count;
+    if (count > 0 && count <= 3) {
+        for (let index = 0; index < count; index++) {
+            echartsCommon.colorList.push(echartsCommon.defalutList[0]);
+        }
+    } else if (count > 3) {
+        echartsCommon.colorList = [echartsCommon.defalutList[0], echartsCommon.defalutList[0], echartsCommon.defalutList[0]];
+        if (count >= 6) {
+            for (let index = 3; index < count; index++) {
+                if (index >= count - 3) {
+                    echartsCommon.colorList.push(echartsCommon.defalutList[2]);
+                } else {
+                    echartsCommon.colorList.push(echartsCommon.defalutList[1]);
+                }
+            }
+        } else {
+            echartsCommon.colorList.push(echartsCommon.defalutList[2]);
+        }
+    }
+    return echartsCommon.colorList;
+};
+echartsCommon.itemStyle = function (fontsize) {
+    return {
+        normal: {
+            color: function (params) {
+                return echartsCommon.setColor()[params.dataIndex];
+            },
+            label: {
+                show: true,
+                position: 'top',
+                formatter: '{c}',
+                textStyle: {
+                    color: "black",
+                    fontSize: fontsize
+                }
+            }
+        }
+    }
+};
+echartsCommon.axisLabel = function () {
+    return {
+        interval: 0, //横轴信息全部显示
+        rotate: -30 //-30度角倾斜显示
+    }
+};
+export default echartsCommon;

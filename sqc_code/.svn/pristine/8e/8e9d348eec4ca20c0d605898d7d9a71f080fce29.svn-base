@@ -1,0 +1,575 @@
+<style lang="less">
+@import "./main.less";
+</style>
+<template>
+  <div class="main" :class="{'main-hide-text': shrink}">
+    <img src="../../static/img/btn-shrink.png" height="80" width="28" class="btn-shrink hide-print" @click="toggleClick" :style="{'left': shrink? '60px':'200px'}">
+    <div class="sidebar-menu-con hide-print" :style="{width: shrink?'60px':'200px', overflow: shrink ? 'visible' : 'auto'}">
+      <shrinkable-menu :shrink="shrink" @on-change="handleSubmenuChange" :theme="menuTheme" :before-push="beforePush" :open-names="openedSubmenuArr" :menu-list="slideMenu">
+        <div slot="top" class="logo-con" style="background:url(data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgFBgcGBQgHBgcJCAgJDBMMDAsLDBgREg4THBgdHRsYGxofIywlHyEqIRobJjQnKi4vMTIxHiU2OjYwOiwwMTD/2wBDAQgJCQwKDBcMDBcwIBsgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDD/wgARCAA7AMgDAREAAhEBAxEB/8QAGgABAQEBAQEBAAAAAAAAAAAAAgEGAwAEBf/EABoBAQEAAwEBAAAAAAAAAAAAAAABAgMFBAb/2gAMAwEAAhADEAAAAP0fl+d9eeUk465RRZFCKnSLJYUORQoqIUWSxRSUzHQ39QQooosihFkQ5LChyKFFRFkUWO2dGvGmY6G+xRRRRZFCLIhyWFDkUKKiLIosUUlMx0N9iiiiiyKEWRDksKHIoUVEWRRYopFbl/fusUUUUWRQiyIclhQ5FCioiyKLFHXXLLJ+zZYoooosihFkQ5LChyKFFRFkUWKOvYzN9H0HGUUUUWRQiyIclhQ5FCioiyKEWLJTM9Df6KKKKLIoRZEOSwocihRURZFCPQpKf//EACEQAQEBAAICAQUBAAAAAAAAAAEAAhARAzFBQlFicZGx/9oACAEBAAE/AMnaFjBk6LyeQyfd/wA4IiIsIIvwzp09sRERERYQ93tVjkiPNrr44IiIiIiIiIiIiLWsuOjgiIiIiIiIiIiIiIjkiIiIiIiIiIiIiIjnGXUREREREREREREREcYw6nRgiIiIiIiIiIiIiIiCxpz646MZ/NP5EREREREREREREWTkn6v3ERERERERERERERyX/8QAHREAAgEEAwAAAAAAAAAAAAAAAREAAjBAUBIgMf/aAAgBAgEBPwCAWW7I78sUkLaCknIAcayBUoZ5sv/EABgRAAMBAQAAAAAAAAAAAAAAAAERYABA/9oACAEDAQE/AOp0IGajP//Z) 100% 100%">
+          <img v-show="!shrink" src="../../static/img/logo.png" key="max-logo" style="height:22px;" />
+          <img v-show="shrink" src="../../static/img/logo-min.png" key="min-logo" style="height:22px;" />
+        </div>
+      </shrinkable-menu>
+    </div>
+    <div class="main-header-con hide-print" :style="{paddingLeft: shrink?'60px':'200px'}" style="height:60px;">
+
+      <div class="main-header">
+
+        <div class="store-message">
+          <Breadcrumb separator="/">
+            <BreadcrumbItem v-for="(tm,index) in breadcrumblist">{{tm.title}}</BreadcrumbItem>
+          </Breadcrumb>
+        </div>
+
+        <div class="store-message">
+          <!-- 店名  -->
+          <div class="store-message" v-if="userMes && userMes.StoreName">
+            <i class="ivu-icon ivu-icon-aaa-dianpu"></i>
+            <p>{{userMes.StoreName}}</p>
+          </div>
+          <!-- *   * -->
+          <div class="store-message" v-else>
+            <i class="ivu-icon ivu-icon-aaa-dianpu"></i>
+            <p>暂无门店</p>
+          </div>
+          <!-- 右侧用户信息   -->
+          <div class="user-message" v-if="userMes && userMes.PositionName">
+            <Avatar :src="avatorPath" style="background: #619fe7;margin-left: 10px;" v-if="avatorPath"></Avatar>
+            <p class="main-user-name">{{ userName }}</p>
+            <p class="main-user-role">{{ userMes.PositionName }}</p>
+            <div class="dropMessage" @mouseenter="isShowTips=true" :class="[isShowTips? 'checked' : '']">
+              <!-- <i class="ivu-icon ivu-icon-aaa-shezhi"></i> @click.native="isShowTips = !isShowTips"-->
+              <Icon type="ios-gear-outline" @click.native="isShowTips = !isShowTips" style="font-size: 30px"></Icon>
+              <ul v-show="isShowTips == true">
+                <!-- <li>  </li> -->
+                <li @click="changePassword" style="list-style: none;">修改信息</li>
+                <li @click="loginOff" style="list-style: none;">退出</li>
+              </ul>
+            </div>
+            <a href="http://123.157.218.226:8008" target="view_window" style="font-size: 18px">帮助</a>
+          </div>
+        </div>
+      </div>
+      <!-- 标签选项 -->
+      <div class="tags-con">
+        <tags-page-opened :pageTagsList="pageTagsList"></tags-page-opened>
+      </div>
+    </div>
+    <div class="single-page-con" :style="{left: shrink?'60px':'200px'}" style=" top:72px">
+      <div class="bg" style="position:fixed; width:100%;height:100%;top:0;left:0; z-index: 99;" @click="isShowTips = !isShowTips" v-if="isShowTips == true"></div>
+      <div class="single-page">
+        <!-- <keep-alive> -->
+        <!-- <keep-alive :include="cachePage">
+                    <router-view></router-view>
+                </keep-alive> -->
+        <keep-alive v-if="cachePage.indexOf($route.name) > -1">
+          <router-view></router-view>
+        </keep-alive>
+        <router-view v-else></router-view>
+      </div>
+    </div>
+
+    <!-- 抽屉样式
+   <Drawer title="Basic Drawer" :closable="false" v-model="modal1">
+        <p>Some contents...</p>
+        <p>Some contents...</p>
+        <p>Some contents...</p>
+    </Drawer>-->
+
+    <!-- 修改密码模态框 -->
+    <Modal :mask-closable="false" v-model="modal1" class="dialog" class-name="vertical-center-modal">
+      <div slot='header' class="header">
+        修改密码
+      </div>
+      <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+        <row type="flex" justify="space-between">
+          <i-col span="24">
+            <FormItem prop="OldPassword" label="旧密码:" :rules="formValidateRule.OldPassword">
+              <Input v-model="formValidate.OldPassword" placeholder="请输入当前密码" />
+            </FormItem>
+          </i-col>
+        </row>
+        <row type="flex" justify="space-between">
+          <i-col span="24">
+            <FormItem prop="NewPassword" label="新密码:" :rules="formValidateRule.NewPassword">
+              <Input v-model="formValidate.NewPassword" placeholder="请输入新密码" />
+            </FormItem>
+          </i-col>
+        </row>
+      </Form>
+      <div slot="footer" class="footer">
+        <Button type="primary" class="btn" @click="editPasswordForm">保存</Button>
+        <Button type="warning" class="btn" @click="resetForm">取消</Button>
+      </div>
+    </Modal>
+    <!-- ** -->
+  </div>
+</template>
+<script>
+import shrinkableMenu from "./main-components/shrinkable-menu/shrinkable-menu.vue";
+import tagsPageOpened from "./main-components/tags-page-opened.vue";
+import breadcrumbNav from "./main-components/breadcrumb-nav.vue";
+import fullScreen from "./main-components/fullscreen.vue";
+import lockScreen from "./main-components/lockscreen/lockscreen.vue";
+import messageTip from "./main-components/message-tip.vue";
+import themeSwitch from "./main-components/theme-switch/theme-switch.vue";
+import Cookies from "js-cookie";
+
+import api from "@/api/index.js";
+import util from "@/libs/util.js";
+import storejs from "storejs";
+import { mapState } from "vuex";
+
+export default {
+  components: {
+    shrinkableMenu,
+    tagsPageOpened,
+    breadcrumbNav,
+    fullScreen,
+    lockScreen,
+    messageTip,
+    themeSwitch
+  },
+  data() {
+    return {
+      breadcrumblist: [], //面包屑数组
+      modal1: false,
+      slideMenu: [],
+      isShowTips: false,
+      messageTipsNum: 929,
+      shrink: false,
+      userName: "",
+      isFullScreen: false,
+      openedSubmenuArr: this.$store.state.app.openedSubmenuArr,
+      formValidate: {
+        OldPassword: "",
+        NewPassword: ""
+      },
+      formValidateRule: {
+        OldPassword: {
+          required: true,
+          message: "旧密码不可为空",
+          trigger: "blur",
+          type: "string"
+        },
+        NewPassword: {
+          required: true,
+          message: "新密码不可为空",
+          trigger: "blur",
+          type: "string"
+        }
+      }
+    };
+  },
+
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      showLoading: state => state.app.showLoading
+    }),
+    menuList() {
+      return this.$store.state.app.menuList;
+    },
+    pageTagsList() {
+      // console.log('this.$store.state.app.pageOpenedList', )
+      let list = this.$store.state.app.pageOpenedList;
+      let arr = [];
+      for (let i of list) {
+        if (i.name !== "home_index") {
+          arr.push(i);
+        }
+      }
+      return arr; // 打开的页面的页面对象
+      // return this.$store.state.app.pageOpenedList; // 打开的页面的页面对象
+    },
+    currentPath() {
+      return this.$store.state.app.currentPath; // 当前面包屑数组
+    },
+    avatorPath() {
+      // 设置头像
+      this.$store.commit("setAvator", this.userMes.HeadImgStr);
+      if (localStorage.getItem("userAvatar")) {
+        return localStorage.getItem("userAvatar");
+      } else {
+        return "";
+      }
+    },
+    cachePage() {
+      return this.$store.state.app.cachePage;
+    },
+    lang() {
+      return this.$store.state.app.lang;
+    },
+    menuTheme() {
+      return this.$store.state.app.menuTheme;
+    },
+    mesCount() {
+      return this.$store.state.app.messageCount;
+    }
+  },
+  methods: {
+    init() {
+      let pathArr = util.setCurrentPath(this, this.$route.name);
+      this.$store.commit("updateMenulist");
+      if (pathArr.length >= 2) {
+        this.$store.commit("addOpenSubmenu", pathArr[1].name);
+      }
+      this.userName = Cookies.get("user");
+      let messageCount = 3;
+      this.messageCount = messageCount.toString();
+      this.checkTag(this.$route.name);
+      this.QueryFistMenu();
+      this.$store.commit("setMessageCount", 3);
+    },
+    changePassword() {
+      this.isShowTips = false;
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = true;
+    },
+    editPasswordForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          let data = {
+            NewPassword: that.formValidate.NewPassword,
+            OldPassword: that.formValidate.OldPassword,
+            EmployeeID: that.userMes.EmployeeID
+          };
+          api.editEmployeePassword(data).then(response => {
+            if (response.error_code === "Success") {
+              that.$Message.success("密码修改成功");
+              that.modal1 = false;
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          this.$Message.error("有必填项为空");
+        }
+      });
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    toggleClick() {
+      this.shrink = !this.shrink;
+    },
+    handleClickUserDropdown(name) {
+      if (name === "ownSpace") {
+        util.openNewPage(this, "ownspace_index");
+        this.$router.push({
+          name: "ownspace_index"
+        });
+      } else if (name === "loginout") {
+        // 退出登录
+        this.$store.commit("logout", this);
+        this.$store.commit("clearOpenedSubmenu");
+        this.$router.push({
+          name: "login"
+        });
+      }
+    },
+    checkTag(name) {
+      let openpageHasTag = this.pageTagsList.some(item => {
+        if (item.name === name) {
+          //console.log(item)
+          return true;
+        }
+      });
+      if (!openpageHasTag) {
+        //  解决关闭当前标签后再点击回退按钮会退到当前页时没有标签的问题
+        util.openNewPage(
+          this,
+          name,
+          this.$route.params || {},
+          this.$route.query || {}
+        );
+      }
+    },
+    QueryFistMenu() {
+      this.breadcrumblist = this.$store.state.app.currentPath;
+    },
+    handleSubmenuChange(val) {
+      // console.log(val)
+    },
+    beforePush(name) {
+      // if (name === 'accesstest_index') {
+      //     return false;
+      // } else {
+      //     return true;
+      // }
+      return true;
+    },
+    fullscreenChange(isFullScreen) {
+      // console.log(isFullScreen);
+    },
+    loginOff() {
+      let that = this;
+      // 清除cookie
+      // let keys=document.cookie.match(/[^ =;]+(?=\=)/g)
+      // if (keys) {
+      //     for (let i = keys.length; i--;) {
+      //         document.cookie = keys[i] + '=0;expires=' + new Date( 0).toUTCString()
+      //     }
+      // }
+      that.$store.commit("logout", that);
+      that.$store.commit("clearOpenedSubmenu");
+      that.$router.push({
+        name: "login"
+      });
+      sessionStorage.clear();
+      localStorage.clear();
+
+      // that.$router.replace('login')
+    }
+  },
+  watch: {
+    $route(to) {
+      this.$store.commit("setCurrentPageName", to.name);
+      let pathArr = util.setCurrentPath(this, to.name);
+      if (pathArr.length > 2) {
+        this.$store.commit("addOpenSubmenu", pathArr[1].name);
+      }
+      this.checkTag(to.name);
+      this.QueryFistMenu();
+      localStorage.currentPageName = to.name;
+    },
+    lang() {
+      util.setCurrentPath(this, this.$route.name); // 在切换语言时用于刷新面包屑
+    }
+  },
+  mounted() {
+    if (
+      navigator.userAgent.match(
+        /(phone|pad|pod|iPhone|iPod|ios|iPad|Android|Mobile|BlackBerry|IEMobile|MQQBrowser|JUC|Fennec|wOSBrowser|BrowserNG|WebOS|Symbian|Windows Phone)/i
+      )
+    ) {
+      this.toggleClick();
+    } else {
+    }
+    //   console.log(document.body.clientWidth)
+    let that = this;
+    this.init();
+  },
+  created() {
+    // 显示打开的页面的列表
+    let that = this;
+    this.$store.commit("setOpenedList");
+    that.slideMenu = JSON.parse(sessionStorage.getItem("menuList"));
+  }
+};
+</script>
+<style>
+/*下拉框样式*/
+.ivu-select-dropdown-list {
+  max-height: 200px;
+}
+/****/
+.logo-con {
+  padding: 16px;
+}
+.logo-con img {
+  height: 23px;
+}
+.logo-con p {
+  color: #fff;
+  font-size: 16px;
+}
+.btn-shrink {
+  position: absolute;
+  left: 200px;
+  top: 50%;
+  z-index: 99;
+  transform: translateY(-50%);
+  transition: left 0.3s;
+  cursor: pointer;
+}
+.main-header-con .main-header {
+  display: flex;
+  justify-content: space-between;
+  /*padding: 0 40px;*/
+  padding: 0 33px;
+  height: 38px;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.02);
+  /* background: #f2f2f2; */
+}
+/*    .main-header .top{
+        display: flex;
+        justify-content: space-between;
+        padding: 0 40px;
+        height: 60px;
+        box-shadow: 0 2px 2px rgba(0,0,0,0.5)
+    }*/
+
+.main-header .store-message {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  margin-right: 16px;
+}
+.main-header .store-message .ivu-icon-dianpu {
+  color: #666;
+  font-size: 16px;
+  margin-right: 10px;
+}
+.main-header .store-message p {
+  font-size: 16px;
+  color: #333;
+  text-align: left;
+}
+.main-header .user-message {
+  display: flex;
+  align-items: center;
+}
+.user-message .ivu-avatar {
+  margin-right: 20px;
+}
+.user-message .main-user-name {
+  font-size: 16px;
+  color: #666;
+  margin-right: 18px;
+}
+.user-message .main-user-role {
+  margin-right: 23px;
+  font-size: 16px;
+}
+.user-message .ivu-icon-xiaoxi,
+.user-message .ivu-icon-shezhi {
+  font-size: 18px;
+  color: #999;
+}
+.user-message .ivu-icon-shezhi {
+  color: #666;
+  cursor: pointer;
+}
+.user-message .checked {
+  color: #82b055;
+}
+.user-message > div {
+  position: relative;
+  margin-right: 23px;
+  padding: 0 4px;
+}
+.user-message .tips {
+  position: absolute;
+  right: -7%;
+  top: -15px;
+  border-radius: 30%;
+  min-width: 24px;
+  height: 24px;
+  font-size: 16px;
+  background-color: #f84a4a;
+  text-align: center;
+  color: #fff;
+  line-height: 20px;
+  padding: 2px 4px;
+}
+.dropMessage > ul {
+  position: absolute;
+  /* top: 160%;*/
+  transition: all 1s;
+  width: 120px;
+  text-align: center;
+  left: 50%;
+  margin-left: -60px;
+  background: #fff;
+  border-radius: 5px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.dropMessage > ul > li {
+  height: 40px;
+  line-height: 40px;
+  font-size: 14px;
+}
+/*
+.dropMessage > ul:before {
+  content: "";
+  position: absolute;
+  top: -58%;
+  left: 51%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 12px solid transparent;
+  border-bottom: 10px solid rgba(0, 0, 0, 0.09);
+}
+.dropMessage > ul:after {
+  content: "";
+  position: absolute;
+  top: -53%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 10px solid transparent;
+  border-bottom: 10px solid white;
+} */
+.dropMessage > ul > li {
+  color: #666;
+}
+.dropMessage > ul > li:hover {
+  background: rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+}
+.dropMessage i:hover {
+  color: #82b055;
+  cursor: pointer;
+}
+.slideDowns-enter-active,
+.slideDowns-leave-active {
+  transition: height 0.5s;
+  height: 0;
+}
+/* .fade-leave-active below version 2.1.8 */
+.slideDowns-enter,
+.slideDowns-leave-to {
+  height: auto;
+}
+.icon-btn {
+  cursor: pointer;
+  color: #666;
+}
+.icon-btn:hover {
+  color: #82b055;
+}
+/*.ivu-table-row{
+        height: 0;
+        overflow: hidden;
+    }*/
+.ivu-radio-inner,
+.ivu-checkbox-inner {
+  border: 1px solid #bbbec4 !important;
+}
+.dialog .pannel-title {
+  font-size: 16px;
+  color: #666;
+  padding: 0 2%;
+  height: 40px;
+  position: relative;
+  line-height: 40px;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ivu-date-picker-cells-month span em,
+.ivu-date-picker-cells-year span em {
+  width: 34px;
+  height: 34px;
+  line-height: 34px;
+}
+.main .single-page-con {
+  top: 81px;
+}
+.ivu-table .demo-table-info-row td {
+  background-color: rgb(236, 162, 177);
+}
+.ivu-table .demo-table-error-row td {
+  background-color: #ff6600;
+  color: #fff;
+}
+</style>

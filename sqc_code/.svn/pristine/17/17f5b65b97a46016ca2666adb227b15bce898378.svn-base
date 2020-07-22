@@ -1,0 +1,146 @@
+<template>
+  <div class="customerPhoto-container">
+    <Collapse v-model="tabIndex" accordion @on-change="tabChange">
+      <Panel :name="item.ID" v-for="(item, index) in list" :key="index">
+        <span style="margin-right: 10px;">{{item.Date}}</span>
+        <span style="margin-right: 10px;">{{item.ItemName}}</span>
+        <span>{{item.PhotoTypeName}}</span>
+        <div slot="content" class="img-box">
+          <div v-for="(img, index1) in imgList" :key="index1" :style="{
+                'backgroundImage': `url(${img.src})`,
+                'backgroundPosition': 'center center',
+                'backgroundRepeat': 'no-repeat',
+                'backgroundSize': 'cover'}" class="img" @click="showBigImg(img)"></div>
+        </div>
+      </Panel>
+    </Collapse>
+    <tableLoadingPage :loading="pageLoading"></tableLoadingPage>
+    <Modal v-model="modal1" class="img-modal">
+      <img :src="bigImgUrl" style="width: 100%;">
+      <div class="" slot="footer"></div>
+    </Modal>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  props: {
+    CustomerID: {
+      type: String,
+      default: ""
+    }
+  },
+  data() {
+    return {
+      modal1: false,
+      ID: "",
+      tabIndex: [],
+      list: [
+        {
+          ItemName: "活氧净肤祛螨护理项目(半年卡)",
+          BeauticianName: "张明月",
+          Date: "2019-02-15T17:03:44.907",
+          ExecuteRecordID: 79079,
+          DomainPath: "http://192.168.1.68:10010/",
+          ImgPath: [
+            "UploadFiles/ExcuteRecordImage/00003/201906/0f40cf8c-298a-40da-a729-e381dcdd1dc1.jpg",
+            "UploadFiles/ExcuteRecordImage/00003/201906/0f40cf8c-298a-40da-a729-e381dcdd1dc1.jpg"
+          ]
+        },
+        {
+          ItemName: "面部祛黑头（体验）",
+          BeauticianName: "张明月",
+          Date: "2019-02-15T10:39:00.243",
+          ExecuteRecordID: 79078,
+          DomainPath: "http://192.168.1.68:10010/",
+          ImgPath: [
+            "UploadFiles/ExcuteRecordImage/00003/201906/0f40cf8c-298a-40da-a729-e381dcdd1dc1.jpg"
+          ]
+        }
+      ],
+      imgList: [],
+      bigImgUrl: "http://192.168.1.68:10010/",
+      bigImgUrl1: "http://192.168.1.68:10010/",
+      pageLoading: true
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    })
+  },
+  methods: {
+    getList() {
+      let that = this;
+      let data = {
+        CustomerID: that.ID,
+        page: 1,
+        size: 500
+      };
+      api.getMedicalPhotoInfoByCustomerID(data).then(res => {
+        that.pageLoading = false;
+        if (res.error_code === "Success") {
+          // that.list = res.data.list;
+          // that.bigImgUrl=res.data.list[0].DomainPath
+        } else {
+          that.$Message.error(res.error_message);
+        }
+      });
+    },
+    showBigImg(img) {
+      console.log(img);
+      let that = this;
+      that.bigImgUrl = img.src;
+      that.modal1 = true;
+    },
+    tabChange(val) {
+      let that = this;
+      that.imgList = [];
+      let arr = that.list[val].ImgPath;
+      let arr1 = [];
+      arr.forEach(v => {
+        // v:that.bigImgUrl+v
+        arr1.push({ src: that.bigImgUrl1 + v });
+      });
+      that.imgList = arr1;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.ID = that.CustomerID;
+    that.$nextTick(() => {
+      that.getList();
+    });
+  },
+  filters: {
+    formatDate(val) {
+      if (!val) {
+        return "";
+      }
+      return moment(val).format("YYYY-MM-DD HH:mm:ss");
+    }
+  }
+};
+</script>
+<style>
+.customerPhoto-container {
+  padding: 10px;
+  padding-bottom: 18px;
+}
+.customerPhoto-container .img-box {
+  overflow: hidden;
+}
+.customerPhoto-container .img-box .img {
+  float: left;
+  margin-right: 10px;
+  width: 80px;
+  height: 80px;
+}
+.img-modal .ivu-modal-close {
+  display: none;
+}
+</style>

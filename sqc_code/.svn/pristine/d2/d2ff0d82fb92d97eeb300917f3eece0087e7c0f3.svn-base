@@ -1,0 +1,635 @@
+<template>
+  <div class="customerTag-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+        <row :gutter="20">
+          <!-- <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker type="date" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker type="date" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col> -->
+          <i-col span="3">
+            <FormItem prop="userName">
+              <Input v-model="formItem.userName" placeholder="标签名称"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="Valid">
+              <Select v-model="formItem.Valid" placeholder="是否有效">
+                <Option :value="-1">全部</Option>
+                <Option :value="1">有效</Option>
+                <Option :value="0">无效</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="18">
+            <formItem class="btn-box">
+              <i-button type="warning" class="btn btn-search" @click="fenlei">标签分类</i-button>
+              <i-button type="primary" class="btn btn-search" @click="searchForm">搜索</i-button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+              <i-button type="primary" class="btn btn-add" @click="showAddPoup" v-if="showAdd">添加</i-button>
+              <i-button type="primary" class="btn btn-purple" @click="getDetail" v-if="showEdit" :disabled="!rowID">修改</i-button>
+              <!-- <i-button type="primary" class="btn btn-add" @click="modal1 = true, modalTitle = '新建'" v-if="setAuthorAdd">添加</i-button> -->
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" :height="setTableHeight" ref="mainTable" highlight-row @on-current-change="getRowID"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+      <!-- <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button type="ghost" class="btn">上一页</i-button>
+            <i-button type="primary" class="btn">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" :value="1"></Input-number>
+                <p>页</p>
+            </div> -->
+    </div>
+    <!-- 新增弹窗 -->
+    <Modal :mask-closable="false" v-model="modal1" class="dialog" v-if="showAdd ||showEdit">
+      <div slot='header' class="header">
+        {{modalTitle}}
+      </div>
+      <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+        <row type="flex" justify="space-between">
+          <i-col span="24">
+
+            <FormItem prop="CRMTagTypeID" label="标签分类：" :label-width="120" :rules="formValidateRule.CRMTagTypeID">
+              <Select v-model="formValidate.CRMTagTypeID" placeholder="标签分类" @on-change="changeCRMTagTypeID">
+                <Option v-for="(item, index) in CRMTagTypeIDList" :value="item.ID" :key="index">{{item.Name}}</Option>
+              </Select>
+            </FormItem>
+
+          </i-col>
+        </row>
+
+        <row type="flex" justify="space-between">
+          <i-col span="24">
+            <FormItem prop="Name" label="标签名称：" :label-width="120" :rules="formValidateRule.Name">
+              <Input v-model="formValidate.Name" placeholder="请输入"></Input>
+            </FormItem>
+          </i-col>
+        </row>
+        <row>
+          <i-col span="24">
+            <FormItem prop="Sex" label="性别：" :label-width="120" :rules="formValidateRule.Sex">
+              <Select v-model="formValidate.Sex" placeholder="请输入" @on-change='changeSex'>
+                <Option :value="0">通用</Option>
+                <Option :value="1">男</Option>
+                <Option :value="2">女</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </row>
+        <row>
+          <i-col span="24">
+            <FormItem prop="Valid" label="是否有效：" :label-width="120" :rules="formValidateRule.Valid">
+              <Select v-model="formValidate.Valid" placeholder="请输入">
+                <Option :value="1">是</Option>
+                <Option :value="0">否</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </row>
+      </Form>
+      <div slot="footer" class="footer">
+        <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+        <Button type="warning" class="btn" @click="resetForm" :loading="loading">取消</Button>
+      </div>
+    </Modal>
+    <!-- ** -->
+
+    <!-- 标签分类弹窗 -->
+    <Modal :mask-closable="false" v-model="modal2" class="dialog">
+      <div slot='header' class="header">
+        标签分类
+      </div>
+
+      <div class="demo-split">
+        顾客自定义标签:
+        <Tag v-for="(item,index) in CRMTagTypeIDList" :key="index" :value="item.ID" @dblclick.native="xiugai(item)">{{item.Name}}</Tag>
+      </div>
+      <div class="demo-split">
+        护理师分发顾客标签:
+        <Tag v-for="(item,index) in CRMTagTypeIDList1" :key="index" :value="item.ID" @dblclick.native="xiugai(item)">{{item.Name}}</Tag>
+      </div>
+
+      <div slot="footer" class="footer">
+        <Button type="primary" class="btn" @click="tianjia" :loading="loading">点击添加</Button>
+        <Button type="warning" class="btn">双击修改</Button>
+      </div>
+    </Modal>
+    <!-- *添加标签* -->
+    <Modal :mask-closable="false" v-model="modal3" class="dialog" :closable="false">
+      <div slot='header' class="header">
+        添加标签
+      </div>
+      <Form ref="formValidate2" :model="formValidate2" :label-width="120" @submit.native.prevent class="form">
+        <Row>
+          <i-col span="24">
+            <FormItem prop="belong" label="标签类别：" :label-width="120" :rules="formValidateRule.belong">
+              <Select v-model="formValidate2.belong" placeholder="请输入">
+                <Option :value="0">护理师分发顾客标签</Option>
+                <Option :value="1">顾客自定义标签</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </Row>
+        <Row>
+          <row type="flex" justify="space-between">
+            <i-col span="24">
+              <FormItem prop="name" label="标签名称：" :label-width="120" :rules="formValidateRule.Name">
+                <Input v-model="formValidate2.name" placeholder="请输入"></Input>
+              </FormItem>
+            </i-col>
+          </row>
+        </Row>
+      </Form>
+      <div slot="footer" class="footer">
+        <Button type="primary" class="btn" @click="baocun" :loading="loading">保存</Button>
+        <Button type="warning" class="btn" @click="quxiao" :loading="loading">取消</Button>
+      </div>
+    </Modal>
+    <!-- ** -->
+    <!-- *修改标签* -->
+    <Modal :mask-closable="false" v-model="modal4" class="dialog" :closable="false">
+      <div slot='header' class="header">
+        修改标签
+      </div>
+      <Form ref="formValidate3" :model="formValidate2" :label-width="120" @submit.native.prevent class="form">
+        <Row>
+          <i-col span="24">
+            <FormItem prop="belong" label="标签类别：" :label-width="120" :rules="formValidateRule.belong">
+              <Select v-model="formValidate2.belong" placeholder="请输入">
+                <Option :value="0">护理师分发顾客标签</Option>
+                <Option :value="1">顾客自定义标签</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+        </Row>
+        <Row>
+          <row type="flex" justify="space-between">
+            <i-col span="24">
+              <FormItem prop="name" label="标签名称：" :label-width="120" :rules="formValidateRule.Name">
+                <Input v-model="formValidate2.name" placeholder="请输入"></Input>
+              </FormItem>
+            </i-col>
+          </row>
+        </Row>
+      </Form>
+      <div slot="footer" class="footer">
+        <Button type="primary" class="btn" @click="baocunXG" :loading="loading">保存</Button>
+        <Button type="warning" class="btn" @click="quxiaoXG" :loading="loading">取消</Button>
+      </div>
+    </Modal>
+    <!-- ** -->
+
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import manager from "@/api/manager.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      split2: 0.5,
+      changeBQ: "",
+      rowID: null,
+      showAdd: false,
+      showEdit: false,
+      tableLoading: false,
+      loading: false,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 200,
+      modalTitle: "修改",
+      phone: "",
+      modal1: false, // 添加弹窗用
+      modal2: false, // 标签分类
+      modal3: false, // 标签分类
+      modal4: false, // 修改标签
+      formValidate2: {
+        id: "",
+        belong: "",
+        name: ""
+      },
+      formValidate: {
+        CRMTagTypeID: 0,
+        Name: "",
+        Valid: 1,
+        Sex: 0
+      },
+      formValidateRule: {
+        CRMTagTypeID: {
+          required: true,
+          message: "分类不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        Name: { required: true, message: "姓名不得为空", trigger: "blur" },
+        Sex: {
+          required: true,
+          message: "性别不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        Valid: {
+          required: true,
+          message: "是否有效不得为空",
+          trigger: "blur",
+          type: "number"
+        }
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        userName: "",
+        Valid: -1
+      },
+      columns1: [
+        {
+          title: "创建人名称",
+          key: "CreateByName",
+          align: "center"
+        },
+        {
+          title: "创建日期",
+          key: "CreateDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.CreateDate) {
+              return h("div", {}, "");
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.CreateDate).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: "标签名称",
+          key: "TagName",
+          align: "center"
+        },
+        {
+          title: "是否有效",
+          key: "Valid",
+          align: "center",
+          render: (h, parmas) => {
+            let text = parmas.row.Valid ? "是" : "否";
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "最后操作人名称",
+          key: "LatestEditByName",
+          align: "center"
+        },
+        {
+          title: "最后操作日期",
+          key: "LatestEditDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.LatestEditDate) {
+              return h("div", {}, "");
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.LatestEditDate).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: "",
+          width: 10
+        }
+      ],
+      list: [],
+      CRMTagTypeIDList: [],
+      CRMTagTypeIDList1: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    changeCRMTagTypeID(val) {
+      let that = this;
+      that.formValidate.CRMTagTypeID = val;
+    },
+    changeSex(val) {
+      let that = this;
+      that.formValidate.Sex = val;
+    },
+    choose(name, id) {
+      this.formItem.store = name;
+      this.formItem.StoreID = id;
+    },
+    fenlei() {
+      let that = this;
+      that.getCRMTagTypeIDList();
+      that.modal2 = true;
+    },
+    tianjia() {
+      let that = this;
+      that.modal2 = false;
+      that.modal3 = true;
+    },
+    xiugai(item) {
+      let that = this;
+      that.modal4 = true;
+      that.formValidate2.id = item.ID;
+      that.formValidate2.belong = item.Belong;
+      that.formValidate2.name = item.Name;
+    },
+    baocun() {
+      let that = this;
+      let data = {
+        name: that.formValidate2.name,
+        belong: that.formValidate2.belong
+      };
+      api.EnumCRMTagTypeAdd(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$refs.formValidate2.resetFields();
+          that.getCRMTagTypeIDList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+      that.modal3 = false;
+      that.modal2 = true;
+    },
+    quxiao() {
+      let that = this;
+      that.$refs.formValidate2.resetFields();
+      that.modal3 = false;
+      that.modal2 = true;
+    },
+    baocunXG() {
+      let that = this;
+      let data = {
+        id: that.formValidate2.id,
+        name: that.formValidate2.name,
+        belong: that.formValidate2.belong
+      };
+      api.EnumCRMTagTypeUpdate(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$refs.formValidate2.resetFields();
+          that.modal4 = false;
+          that.getCRMTagTypeIDList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    quxiaoXG() {
+      let that = this;
+      that.$refs.formValidate2.resetFields();
+      that.modal4 = false;
+    },
+    showAddPoup() {
+      let that = this;
+      that.resetForm();
+      that.getCRMTagTypeIDList();
+      that.modal1 = true;
+      that.modalTitle = "新建";
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            that.showAdd = i.IsVisible;
+          }
+          if (i.Name === "修改") {
+            that.showEdit = i.IsVisible;
+          }
+        }
+      }
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+    },
+    getDetail() {
+      let that = this;
+      that.getCRMTagTypeIDList();
+      if (!that.rowID) {
+        that.$Message.error("请选择一条记录");
+        return false;
+      }
+      that.$store.commit("changeLoadingPage");
+      manager.getSingleCustomerTag(that.rowID).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code == "Success") {
+          that.formValidate = {
+            CRMTagTypeID: response.data.ID,
+            Name: response.data.TagName,
+            Valid: response.data.Valid ? 1 : 0
+          };
+          that.modal1 = true;
+          that.modalTitle = "修改";
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    modefyMessage(data) {
+      let that = this;
+      let d = {
+        CRMTagTypeID: that.formValidate.CRMTagTypeID,
+        TagName: data.TagName,
+        Valid: data.Valid,
+        EmployeeID: that.userMes.EmployeeID
+      };
+      manager
+        .modefySingleCustomerTag(that.formValidate.CRMTagTypeID, d)
+        .then(response => {
+          if (response.error_code === "Success") {
+            that.loading = false;
+            that.$Message.success("修改成功");
+            that.resetForm();
+            that.getList();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+    },
+    resetForm() {
+      let that = this;
+      that.formValidate.CRMTagTypeID = "";
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    addForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          that.loading = true;
+          let data = {
+            Enum_CRMTagTypeID: that.formValidate.CRMTagTypeID,
+            TagName: that.formValidate.Name,
+            EmployeeID: that.userMes.EmployeeID,
+            Valid: that.formValidate.Valid > 0 ? true : false,
+            Sex: that.formValidate.Sex
+          };
+          if (that.formValidate.CRMTagTypeID) {
+            that.modefyMessage(data);
+            return false;
+          }
+          manager.addCustomerTags(data).then(response => {
+            that.loading = false;
+            if (response.error_code == "Success") {
+              that.$Message.success("添加成功");
+              that.getList();
+              that.resetForm();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          this.$Message.error("有必填项为空");
+        }
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    getList() {
+      let that = this;
+      let data = {
+        Name: that.formItem.userName,
+        // StartDate: that.formItem.startDate,
+        // EndDate: that.formItem.endDate,
+        Valid: ""
+      };
+      if (that.formItem.Valid === 1) {
+        data.Valid = true;
+      } else if (that.formItem.Valid === 0) {
+        data.Valid = false;
+      }
+      // 转换日期
+      if (data.StartDate) {
+        data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+      }
+      if (data.EndDate) {
+        data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+      }
+      that.tableLoading = true;
+      manager.getCustomerTagsList(data).then(response => {
+        that.tableLoading = false;
+        if (response.error_code == "Success") {
+          let res = response.data.list;
+          that.list = res;
+          // that.setPage()
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    // 获取标签分类列表
+    getCRMTagTypeIDList() {
+      let that = this;
+      manager.EnumCRMTagTypegetList().then(response => {
+        if (response.error_code == "Success") {
+          let res = response.data.list;
+          // that.CRMTagTypeIDList = response.data.list;
+          // that.setPage()
+          res.forEach(item => {
+            if (item.Belong == 1) {
+              that.CRMTagTypeIDList.push(item);
+            } else {
+              that.CRMTagTypeIDList1.push(item);
+            }
+          });
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.setAuthor();
+    });
+  }
+};
+</script>
+<style>
+.demo-split {
+  height: 200px;
+  border: 1px solid #dcdee2;
+}
+.demo-split-pane {
+  padding: 10px;
+}
+</style>

@@ -1,0 +1,342 @@
+<template>
+  <div class="QYjysh-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="sCityName">
+              <Select v-model="formItem.sCityName" placeholder="门店" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.UnderstandWay" placeholder="渠道" :filterable="true">
+                <Option value="all" @click.native="choose1()">所有</Option>
+                <Option v-for="item in UnderstandWayList" :value="item.ID" :key="item.ID" @click.native="choose1(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="12">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="searchList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+
+    </div>
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          新客渠道分类
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/common.js";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      name1: "",
+      name2: "",
+      name3: "",
+      name4: "",
+      spinShow: true,
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        sCity: "",
+        sCityName: "",
+        UnderstandWay: "all",
+        UnderstandWayID: ""
+      },
+      list: [],
+      storeList: [],
+      UnderstandWayList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    // setTableHeight() {
+    //   let h = 440;
+    //   if (window.innerHeight > 900) {
+    //     h = 540;
+    //   }
+    //   return h / 768 * window.innerHeight;
+    // },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    choose(name, id) {
+      let that = this;
+      this.formItem.sCity = id;
+    },
+    choose1(name, id) {
+      let that = this;
+      if (name === undefined && id === undefined) {
+        that.formItem.UnderstandWay = "所有";
+        that.name1 = "";
+        that.formItem.UnderstandWayID = null;
+      } else {
+        that.formItem.UnderstandWay = name;
+        that.formItem.UnderstandWayID = id;
+        that.name1 = name;
+      }
+    },
+    searchList() {
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    setEcharts(NewCustDan, NewCustAmount, CountCustDan, CounCustAmount, Name) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: ["#003366", "#006699", "#4cabce", "#e5323e"],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              type: "shadow"
+            }
+          },
+          legend: {
+            data: [
+              that.name1 + "新客客单",
+              that.name1 + "新客消费",
+              that.name1 + "总客单",
+              that.name1 + "总消费"
+            ]
+          },
+          toolbox: {
+            show: true,
+            orient: "vertical",
+            left: "right",
+            top: "center",
+            feature: {
+              mark: { show: true },
+              dataView: { show: true, readOnly: false },
+              magicType: {
+                show: true,
+                type: ["line", "bar", "stack", "tiled"]
+              },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
+          },
+          calculable: true,
+          xAxis: [
+            {
+              type: "category",
+              axisTick: { show: false },
+              data: Name,
+              axisLabel: {
+                interval: 0, //横轴信息全部显示
+                rotate: -30 //-30度角倾斜显示
+              }
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+            }
+          ],
+          series: [
+            {
+              name: that.name1 + "新客客单",
+              type: "bar",
+              barGap: 0,
+              data: NewCustDan,
+              itemStyle: echartsCommon.itemStyle(10)
+            },
+            {
+              name: that.name1 + "新客消费",
+              type: "bar",
+              data: NewCustAmount,
+              itemStyle: echartsCommon.itemStyle(10)
+            },
+            {
+              name: that.name1 + "总客单",
+              type: "bar",
+              data: CountCustDan,
+              itemStyle: echartsCommon.itemStyle(10)
+            },
+            {
+              name: that.name1 + "总消费",
+              type: "bar",
+              data: CounCustAmount,
+              itemStyle: echartsCommon.itemStyle(10)
+            }
+          ]
+        };
+        dataSourcePie.setOption(optionPie);
+        that.spinShow = false;
+        // window.addEventListener("resize", function() {
+        //   dataSourcePie.resize();
+        // });
+      });
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          employeeId: that.userMes.EmployeeID,
+          StartDate: that.formItem.startDate,
+          EndDate: that.formItem.endDate,
+          sCity: that.formItem.sCity,
+          sUnderstandWayID: that.formItem.UnderstandWayID
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        }
+        that.spinShow = true;
+        api.getConsumptionCustKeDan(data).then(response => {
+          if (response.error_code === "Success") {
+            that.list = response.data.list;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 200);
+    },
+    setPieData() {
+      let that = this;
+      let NewCustDan = [];
+      let NewCustAmount = [];
+      let CountCustDan = [];
+      let CounCustAmount = [];
+      let Name = [];
+      for (let i in that.list) {
+        let a = {
+          NewCustDan: that.list[i].NewCustDan.toFixed(2),
+          NewCustAmount: that.list[i].NewCustAmount.toFixed(2),
+          CountCustDan: that.list[i].CountCustDan.toFixed(2),
+          CounCustAmount: that.list[i].CounCustAmount.toFixed(2),
+          Name: that.list[i].Name
+        };
+
+        NewCustDan.push(a.NewCustDan);
+        NewCustAmount.push(a.NewCustAmount);
+        CountCustDan.push(a.CountCustDan);
+        CounCustAmount.push(a.CounCustAmount);
+        Name.push(a.Name);
+      }
+      that.setEcharts(
+        NewCustDan,
+        NewCustAmount,
+        CountCustDan,
+        CounCustAmount,
+        Name
+      );
+    },
+    // 获取区域列表
+    getStore() {
+      let that = this;
+      let data = {
+        employeeId: that.userMes.EmployeeID,
+        sCity: ""
+      };
+      api.NewGetAllCityInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.sCityName = that.storeList[0].Name;
+          that.formItem.sCity = that.storeList[0].ID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取渠道列表
+    getUnderstandWayInfo() {
+      let that = this;
+      api.getUnderstandWayInfo().then(response => {
+        if (response.error_code === "Success") {
+          that.UnderstandWayList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getStore();
+    that.getUnderstandWayInfo();
+    that.getList();
+  }
+};
+</script>
+<style>
+</style>

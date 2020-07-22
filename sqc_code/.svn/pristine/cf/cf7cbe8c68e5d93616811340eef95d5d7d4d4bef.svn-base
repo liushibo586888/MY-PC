@@ -1,0 +1,317 @@
+<template>
+    <div class="QYjysh-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="sCityName">
+                            <Select v-model="formItem.sCityName" placeholder="门店" :filterable="true">
+                                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="ItemCategoryID">
+                            <Select v-model="formItem.ItemCategoryID" placeholder="选择项目" :filterable="true">
+                                <Option :value="item.Name" v-for="(item, index) in zxxmList" :key="index" @click.native="choose1(item.Name,item.ID)">{{item.Name}}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn" @click="searchList">查询</Button>
+                            <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+
+        </div>
+        <!-- 图表 -->
+        <div class="form-box">
+            <div class="charts">
+                <div class="header">
+                    新客项目分类
+                </div>
+                <div class="content">
+                    <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+                    <div id="data_source_com" class="forms"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+export default {
+  data() {
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      spinShow: true,
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        sCity: "",
+        ItemCategoryID: "",
+        ItemId: "",
+        sCityName: ""
+      },
+      list: [],
+      storeList: [],
+      zxxmList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    choose(name, id) {
+      this.formItem.sCity = id;
+    },
+    choose1(name, id) {
+      this.formItem.ItemId = id;
+    },
+    searchList() {
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    setEcharts(NewCustDan, NewCustAmount, CountCustDan, CounCustAmount, Name) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: ["#003366", "#006699", "#4cabce", "#e5323e"],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              type: "shadow"
+            }
+          },
+          legend: {
+            data: ["新客客单", "新客消费", "总客单", "总消费"]
+          },
+          toolbox: {
+            show: true,
+            orient: "vertical",
+            left: "right",
+            top: "center",
+            feature: {
+              mark: { show: true },
+              dataView: { show: true, readOnly: false },
+              magicType: {
+                show: true,
+                type: ["line", "bar", "stack", "tiled"]
+              },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
+          },
+          calculable: true,
+          xAxis: [
+            {
+              type: "category",
+              axisTick: { show: false },
+              data: Name,
+              axisLabel: {
+                interval: 0, //横轴信息全部显示
+                rotate: -30 //-30度角倾斜显示
+              }
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+            }
+          ],
+          series: [
+            {
+              name: "新客客单",
+              type: "bar",
+              barGap: 0,
+              data: NewCustDan
+            },
+            {
+              name: "新客消费",
+              type: "bar",
+              data: NewCustAmount
+            },
+            {
+              name: "总客单",
+              type: "bar",
+              data: CountCustDan
+            },
+            {
+              name: "总消费",
+              type: "bar",
+              data: CounCustAmount
+            }
+          ]
+        };
+
+        dataSourcePie.setOption(optionPie);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          EmployeeId: that.userMes.EmployeeID,
+          StartDate: that.formItem.startDate,
+          EndDate: that.formItem.endDate,
+          AreaId: that.formItem.sCity,
+          ItemId: that.formItem.ItemId
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        }
+        that.spinShow = true;
+        api.AreaNewCustomerItemConsumeReport(data).then(response => {
+          if (response.error_code === "Success") {
+            that.list = response.data;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 200);
+    },
+    setPieData() {
+      let that = this;
+      let NewCustDan = [];
+      let NewCustAmount = [];
+      let CountCustDan = [];
+      let CounCustAmount = [];
+      let Name = [];
+      for (let i in that.list) {
+        let a = {
+          NewCustDan: that.list[i].NewCustomerPrice.toFixed(2),
+          NewCustAmount: that.list[i].NewCustomerCous.toFixed(2),
+          CountCustDan: that.list[i].TotalPrice.toFixed(2),
+          CounCustAmount: that.list[i].TotalCous.toFixed(2),
+          Name: that.list[i].StoreName
+        };
+
+        NewCustDan.push(a.NewCustDan);
+        NewCustAmount.push(a.NewCustAmount);
+        CountCustDan.push(a.CountCustDan);
+        CounCustAmount.push(a.CounCustAmount);
+        Name.push(a.Name);
+      }
+      that.setEcharts(
+        NewCustDan,
+        NewCustAmount,
+        CountCustDan,
+        CounCustAmount,
+        Name
+      );
+    },
+    // 获取区域列表
+    getStore() {
+      let that = this;
+      api.GetAllCityInfo().then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.sCityName = that.storeList[0].Name;
+          that.formItem.sCity = that.storeList[0].ID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 渠道列表
+    getProjectList() {
+      let that = this;
+      api.getValidSubCategories().then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.zxxmList = res.list;
+          that.formItem.ItemCategoryID = that.zxxmList[0].Name;
+          that.formItem.ItemId = that.zxxmList[0].ID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+    that.getStore();
+    that.getProjectList();
+  }
+};
+</script>
+<style>
+</style>

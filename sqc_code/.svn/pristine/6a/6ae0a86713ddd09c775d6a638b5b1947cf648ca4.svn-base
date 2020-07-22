@@ -1,0 +1,128 @@
+<template>
+  <div class="customerPhoto-container">
+     <Collapse v-model="tabIndex" accordion @on-change="tabChange">
+        <Panel :name="item.ID" v-for="(item, index) in list" :key="index">
+            <span style="margin-right: 10px;">{{item.Date | formatDate}}</span><span style="margin-right: 10px;">{{item.ItemName}}</span><span>{{item.PhotoTypeName}}</span>
+            <div slot="content" class="img-box">
+              <div v-for="(img, index1) in imgList" :key="index1" :style="{
+                'backgroundImage': `url(${img})`,
+                'backgroundPosition': 'center center',
+                'backgroundRepeat': 'no-repeat',
+                'backgroundSize': 'cover'}" class="img" @click="showBigImg(img)"></div>
+            </div>
+        </Panel>
+      </Collapse>
+      <tableLoadingPage :loading="pageLoading"></tableLoadingPage>
+      <Modal v-model="modal1" class="img-modal">
+        <img :src="bigImgUrl" style="width: 100%;">
+        <div class="" slot="footer"></div>
+    </Modal>
+  </div>
+</template>
+<script>
+  import api from '@/api/index.js'
+  import { mapState } from 'vuex'
+  import moment from 'moment'
+  export default {
+    props: {
+      CustomerID: {
+        type: String,
+        default: ''
+      }
+    },
+    data () {
+      return {
+        modal1: false,
+        ID: '',
+        tabIndex: [],
+        list: [],
+        imgList: [],
+        bigImgUrl: '',
+        pageLoading: true
+      }
+    },
+    computed: {
+      ...mapState({
+        userMes: state => state.app.userMes,
+        tableRows: state => state.app.tableRows
+      })
+    },
+    methods: {
+      getList () {
+        let that = this
+        let data = {
+          CustomerID: that.ID,
+          page: 1,
+          size: 500
+        }
+        api.getMedicalPhotoInfoByCustomerID(data).then((response) => {
+          that.pageLoading = false
+          if (response.error_code === 'Success') {
+            that.list = response.data.list
+          } else {
+            that.$Message.error(response.error_message)
+          }
+        })
+      },
+      showBigImg (img) {
+        let that = this
+        that.bigImgUrl = img
+        that.modal1 = true
+      },
+      tabChange (val) {
+        let that = this
+        if (val.length <= 0) {
+          return false
+        }
+        that.imgList = []
+        that.$store.commit('changeLoadingPage')
+        api.getSingleMedicalPhoto(val).then((response) => {
+          that.$store.commit('changeLoadingPage')
+          if (response.error_code === 'Success') {
+            let arr = []
+            for (let i of response.data.Details) {
+              let a = 'data:image/jpeg;base64,' + i.Photo
+              arr.push(a)
+            }
+            that.imgList = arr
+          } else {
+            that.$Message.error(response.error_message)
+          }
+        })
+      }
+    },
+    mounted () {
+      let that = this
+      that.ID = that.CustomerID
+      that.$nextTick(() => {
+      that.getList()
+      })
+    },
+    filters: {
+      formatDate (val) {
+        if (!val) {
+          return ''
+        }
+        return moment(val).format('YYYY-MM-DD HH:mm:ss')
+      }
+    }
+  }
+</script>
+<style>
+  .customerPhoto-container{
+    padding: 10px;
+    padding-bottom: 18px;
+  }
+  .customerPhoto-container .img-box {
+    overflow: hidden;
+  }
+  .customerPhoto-container .img-box .img {
+    float: left;
+    margin-right: 10px;
+    width: 80px;
+    height: 80px;
+  }
+  .img-modal .ivu-modal-close{
+    display: none;
+  }
+</style>

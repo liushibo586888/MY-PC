@@ -1,0 +1,533 @@
+<template>
+    <div class="zfmx-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="StartDate">
+                            <DatePicker type="month" placeholder="开始日期" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="EndDate">
+                            <DatePicker type="month" placeholder="结束日期" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="store">
+                            <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                                <Option value="all" @click.native="choose()">所有</Option>
+                                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="15">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+                            <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+                            <Button type="success" class="btn btn-search" @click="tianjia">添加</Button>
+                            <Button type="error" class="btn btn-reset" @click="xiugai">修改</Button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-row-click="getRowID"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <!-- 修改弹窗 -->
+        <Modal :mask-closable="false" v-model="modal" width="800" class="dialog">
+            <div slot='close' class="close not-print" @click="quXiao">
+                <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="100" @submit.native.prevent class="form">
+                <row type="flex" style="margin-right:30px">
+                    <i-col span="8">
+                        <FormItem prop="StoreName" label="门店名称:">
+                            <Input v-model="formValidate.StoreName" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="Year" label="年份:">
+                            <Input v-model="formValidate.Year" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="Month" label="月份:">
+                            <Input v-model="formValidate.Month" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" style="margin-right:30px">
+                    <i-col span="8">
+                        <FormItem prop="EarlyGoal" label="上旬业绩目标:">
+                            <Input v-model="formValidate.EarlyGoal" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="MiddleGoal" label="中旬业绩目标：">
+                            <Input v-model="formValidate.MiddleGoal" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="LateGoal" label="下旬业绩目标：">
+                            <Input v-model="formValidate.LateGoal" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+            </Form>
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="baoCun" :loading="onLoading">保存</Button>
+                <Button class="btn" type="warning" @click="quXiao" :loading="onLoading">取消</Button>
+            </div>
+        </Modal>
+
+        <!-- 添加弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" width="1000" class="dialog">
+            <div slot='close' class="close not-print" @click="quXiaoTJ">
+                <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+            </div>
+            <Form ref="formValidateTJ" :model="formValidateTJ" :label-width="110" @submit.native.prevent class="form">
+                <row type="flex" style="margin-right:30px">
+                    <i-col span="8">
+                        <FormItem prop="StoreName" label="门店名称:" :rules="formValidateRule.StoreName">
+                            <Select v-model="formValidateTJ.StoreName" placeholder="门店名称:" :filterable="true">
+                                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="chooseTJ(item.Name,item.ID)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="Year" label="年份:" :rules="formValidateRule.Year">
+                            <Input v-model="formValidateTJ.Year" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="Month" label="月份:" :rules="formValidateRule.Month">
+                            <Input v-model="formValidateTJ.Month" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" style="margin-right:30px">
+                    <i-col span="8">
+                        <FormItem prop="EarlyGoal" label="上旬业绩目标:" :rules="formValidateRule.EarlyGoal">
+                            <Input v-model="formValidateTJ.EarlyGoal" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="MiddleGoal" label="中旬业绩目标：" :rules="formValidateRule.MiddleGoal">
+                            <Input v-model="formValidateTJ.MiddleGoal" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="8">
+                        <FormItem prop="LateGoal" label="下旬业绩目标：" :rules="formValidateRule.LateGoal">
+                            <Input v-model="formValidateTJ.LateGoal" placeholder="无"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+            </Form>
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="baoCunTJ" :loading="onLoading">保存</Button>
+                <Button class="btn" type="warning" @click="quXiaoTJ" :loading="onLoading">取消</Button>
+            </div>
+        </Modal>
+
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    return {
+      onLoading: false,
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      modal: false, //修改
+      modal1: false, //添加
+      tableHeight: 40,
+      rowID: "",
+      formValidate: {
+        StoreId: "",
+        StoreName: "",
+        Year: "",
+        Month: "",
+        EarlyGoal: "",
+        MiddleGoal: "",
+        LateGoal: ""
+      },
+      formValidateTJ: {
+        StoreId: "",
+        StoreName: "",
+        Year: "",
+        Month: "",
+        EarlyGoal: "",
+        MiddleGoal: "",
+        LateGoal: ""
+      },
+      formValidateRule: {
+        StoreName: {
+          required: true,
+          message: "门店不能为空",
+          trigger: "blur"
+        },
+        Year: {
+          required: true,
+          message: "年份不能为空",
+          trigger: "blur"
+        },
+        Month: {
+          required: true,
+          message: "月份不得为空",
+          trigger: "blur"
+        },
+        EarlyGoal: {
+          required: true,
+          message: "目标不得为空",
+          trigger: "blur"
+        },
+        MiddleGoal: {
+          required: true,
+          message: "目标不得为空",
+          trigger: "blur"
+        },
+        LateGoal: {
+          required: true,
+          message: "目标不得为空",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        StartDate: new Date(),
+        EndDate: new Date(),
+        StoreID: null,
+        EmployeeID: "",
+        store: "all",
+        page: "",
+        size: ""
+      },
+      columns1: [
+        {
+          title: "门店名称",
+          key: "StoreName",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "年份",
+          key: "Year",
+          align: "center",
+          width: 250,
+          render: (h, params) => {
+            return h("div", {}, params.row.Year + " 年");
+          }
+        },
+        {
+          title: "月份",
+          key: "Month",
+          align: "center",
+          width: 250,
+          render: (h, params) => {
+            return h("div", {}, params.row.Month + " 月");
+          }
+        },
+        {
+          title: "上旬业绩目标",
+          key: "EarlyGoal",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "中旬业绩目标",
+          key: "MiddleGoal",
+          align: "center",
+          width: 250
+        },
+        {
+          title: "下旬业绩目标",
+          key: "LateGoal",
+          align: "center",
+          width: 250
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    tianjia() {
+      let that = this;
+      that.modal1 = true;
+    },
+    baoCunTJ() {
+      //添加---保存按钮
+      let that = this;
+      that.onLoading = true;
+      let data = {
+        StoreId: that.formValidateTJ.StoreId,
+        Year: that.formValidateTJ.Year,
+        Month: that.formValidateTJ.Month,
+        EarlyGoal: that.formValidateTJ.EarlyGoal,
+        MiddleGoal: that.formValidateTJ.MiddleGoal,
+        LateGoal: that.formValidateTJ.LateGoal
+      };
+      api.PerformanceTargetAdd(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("添加成功");
+          that.getList();
+          that.onLoading = false;
+          that.quXiaoTJ();
+        } else {
+          that.$Message.error(response.error_message);
+          that.onLoading = false;
+          //   that.quXiaoTJ();
+        }
+      });
+    },
+    quXiaoTJ() {
+      //添加-取消按钮
+      let that = this;
+      that.$refs.formValidateTJ.resetFields();
+      that.modal1 = false;
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.Id;
+    },
+    xiugai() {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条数据");
+      } else {
+        that.modal = true;
+        let data = {
+          Id: that.rowID
+        };
+        api.PerformanceTargetgetModel(data).then(response => {
+          if (response.error_code === "Success") {
+            that.setData(response.data);
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }
+    },
+    setData(res) {
+      //点击修改时设置数据
+      let that = this;
+      that.formValidate.StoreName = res.StoreName;
+      that.formValidate.Year = res.Year;
+      that.formValidate.Month = res.Month;
+      that.formValidate.EarlyGoal = res.EarlyGoal;
+      that.formValidate.MiddleGoal = res.MiddleGoal;
+      that.formValidate.LateGoal = res.LateGoal;
+      that.formValidate.StoreId = res.StoreId;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      // 两者同时存在
+      if (Number(that.formItem.StartDate) > Number(that.formItem.EndDate)) {
+        that.$Message.error("开始日期不得大于结束日期");
+        return false;
+      }
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    quXiao() {
+      //修改---取消按钮
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal = false;
+    },
+    baoCun() {
+      //修改---保存按钮
+      let that = this;
+      that.onLoading = true;
+      let data = {
+        Id: that.rowID,
+        StoreId: that.formValidate.StoreId,
+        Year: that.formValidate.Year,
+        Month: that.formValidate.Month,
+        EarlyGoal: that.formValidate.EarlyGoal,
+        MiddleGoal: that.formValidate.MiddleGoal,
+        LateGoal: that.formValidate.LateGoal
+      };
+      api.PerformanceTargetEdit(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.getList();
+          that.rowID = "";
+          that.onLoading = false;
+          that.quXiao();
+        } else {
+          that.$Message.error(response.error_message);
+          that.onLoading = false;
+          //   that.quXiao();
+        }
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let userMessage = JSON.parse(localStorage.userMessage);
+        that.formItem.EmployeeID = userMessage.EmployeeID;
+        that.formItem.page = that.tablePage.page;
+        that.formItem.size = that.tablePage.pageNum;
+        let data = {
+          EmployeeId: userMessage.EmployeeID,
+          StoreId: that.formItem.StoreID,
+          StartDate: that.formItem.StartDate,
+          EndDate: that.formItem.EndDate,
+          PageIndex: that.formItem.page,
+          PageSize: that.formItem.size
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM");
+          that.formItem.StartDate = data.StartDate;
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM");
+          that.formItem.EndDate = data.EndDate;
+        }
+        that.tableLoading = true;
+        api.PerformanceTarget(data).then(response => {
+          if (response.error_code === "Success") {
+            let res = response.data;
+            that.list = res.list;
+            that.tableLoading = false;
+            that.page = res.page;
+            that.tablePage.allNum = res.total;
+            that.tablePage.maxPageNum = res.totalPage;
+            that.setPage();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let arr = [];
+      api.getValidStores().then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    choose(name, id) {
+      if (name === undefined && id === undefined) {
+        this.formItem.store = "所有";
+        this.formItem.StoreID = null;
+      } else {
+        this.formItem.store = name;
+        this.formItem.StoreID = id;
+      }
+    },
+    chooseTJ(name, id) {
+      this.formValidateTJ.StoreId = id;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.getStore();
+    });
+  }
+};
+</script>
+<style>
+</style>
+

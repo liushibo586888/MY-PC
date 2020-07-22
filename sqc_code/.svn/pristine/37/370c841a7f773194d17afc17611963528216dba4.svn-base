@@ -1,0 +1,667 @@
+<template>
+    <div class="zxjl-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker type="date" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker type="date" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userName">
+                            <Input v-model="formItem.userName" placeholder="姓名"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userTel">
+                            <Input v-model="formItem.userTel" placeholder="电话"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <formItem class="btn-box">
+                            <i-button type="primary" class="btn" @click="searchForm">搜索</i-button>
+                            <i-button type="warning" class="btn" @click="resetSearch">重置</i-button>
+                            <i-button type="primary" class="btn btn-add" @click="showAddPoup" v-if="showAdd">添加</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+        <!-- 查询电话号码弹窗 -->
+        <Modal :mask-closable="false"  v-model="poupSearchTel" class="dialog" class-name="vertical-center-modal" v-if="showAdd" @submit.native.prevent="searchCustomerTel">
+            <div slot='header' class="header">
+                请输入电话号码
+            </div>
+            <Form :model="searchTel" ref="searchTelForm">
+                <Form-item prop="tel" :rules="searchRule.tel">
+                    <i-input v-model="searchTel.tel" placeholder="请输入用户的手机号" autofocus ref="searchTel"></i-input>
+                </Form-item>
+            </Form>
+            <div slot='footer' class="footer">
+                <i-button type="primary" class="btn" @click="searchCustomerTel" :loading="loading">确定</i-button>
+                <i-button type="warning" class="btn" @click="searchReset" :loading="loading">取消</i-button>
+            </div>
+        </Modal>
+        <!-- 弹窗 -->
+        <Modal :mask-closable="false"  v-model="modal1" class="dialog" width="1000" v-if="showAdd">
+            <div slot='header' class="header">
+                新增
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+                <row>
+                    <i-col span="12">
+                        <FormItem prop="CustomerName" label="客户姓名：">
+                            <Input v-model="formValidate.CustomerName" placeholder="姓名" disabled></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <FormItem label="电话：" prop="CustomerPhone">
+                            <Input v-model="formValidate.CustomerPhone" placeholder="电话 "disabled></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row>
+                    <i-col span="12">
+                        <FormItem label="年龄：" prop="CustomerAge">
+                            <Input v-model="formValidate.CustomerAge" placeholder="年龄" disabled></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <FormItem label="性别：" prop="CustomerSex">
+                            <Input v-model="formValidate.CustomerSex" placeholder="性别" disabled></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <FormItem label="咨询项目：" prop="ConsultProjectID" :rules="formValidateRule.ConsultProjectID">
+                    <Select v-model="formValidate.ConsultProjectID" placeholder="请选择" filterable>
+                        <Option :value="item.ID" v-for="(item, index) in zxxmList" :key="index">{{item.Name}}</Option>
+                    </Select>
+
+                </FormItem>
+                <FormItem label="咨询内容：" prop="ConsultContent" :rules="formValidateRule.ConsultContent">
+                    <Input v-model="formValidate.ConsultContent" placeholder="咨询内容" type="textarea" :rows="4" :maxlength="220"></Input>
+                </FormItem>
+            </Form>
+            <!-- 历史咨询记录查询 -->
+            <!-- <div class="table-box">
+                <Table :columns="columns2" :data="list2"></Table>
+            </div> -->
+            <!-- 时间轴 -->
+            <div class="pannel-title"><p>历史咨询记录</p></div>
+            <div class="table-box" style="width:90%; height:400px; overflow-y:scroll; margin: 0 auto;" v-if="list2.length > 0">
+                <Timeline style="margin: 0 auto;">
+                    <TimelineItem v-for="(item, index) in list2" :key="index">
+                        <p class="time" style="margin-bottom:4px;">咨询日期：{{item.Date | formatDate}} 咨询项目：{{item.ItemCategoryName}}</p>
+                        <!-- <p class="time" style="margin-bottom:4px;"></p> -->
+                        <p class="time" style="margin-bottom:4px;">咨询人：{{item.ConsultingByName}} 职位：{{item.PositionName}} <template v-if="item.StoreName">所属门店：{{item.StoreName}}</template></p>
+                        <!-- <p class="time" style="margin-bottom:4px;"></p> -->
+                        <!-- <p class="time" style="margin-bottom:4px;" v-if="item.StoreName">所属门店：{{item.StoreName}}</p> -->
+                        <p class="content" style="padding-right: 20px;">咨询内容：{{item.ConsultingContent}}</p>
+                    </TimelineItem>
+                </Timeline>
+            </div>
+            <div v-else style="padding-left: 30px; color: #999; text-align: center;">暂无记录</div>
+            <!-- ** -->
+            <div slot="footer" class="footer">
+                <Button class="btn" type="primary" @click="addForm" :loading="loading">保存</Button>
+                <Button class="btn" type="warning" @click="resetForm" :loading="loading">取消</Button>
+            </div>
+        </Modal>
+    </div>
+</template>
+<script>
+    import api from '@/api/index.js'
+    import moment from "moment"
+    import storejs from 'storejs'
+    import { mapState } from 'vuex'
+    export default{
+        data () {
+            const validateTel = (rule, value, callback) => {
+                let reg = /^1\d{10}$/
+                if (value === '') {
+                    callback(new Error('手机号不得为空'));
+                }else if(!reg.test(value)){
+                    callback(new Error('请输入正确的手机号'));
+                }else {
+                    callback()
+                }
+            }
+            return {
+                showAdd: false,
+                tablePage: {
+                    page: 1,
+                    pageNum: 10,
+                    maxPageNum: 100,
+                    allNum: 199,
+                    startNum: 0,
+                    endNum: 0
+                },
+                loading: false,
+                tableHeight: 200,
+                tableLoading: false,
+                poupSearchTel: false,
+                searchTel: {
+                    tel: ''
+                },
+                searchRule: {
+                    tel: {required: true, message: '请输入正确的手机号码', trigger: 'blur', type: 'number', validator: validateTel}
+                },
+                modal1: false,
+                formValidate: {
+                    CustomerID: '',
+                    CustomerName: '',
+                    CustomerPhone: '',
+                    CustomerAge: '',
+                    CustomerSex: '',
+                    ConsultProjectID: '',
+                    ConsultContent: ''
+                },
+                formValidateRule: {
+                    CustomerName: {required: true, message: '姓名不得为空', trigger: 'blur'},
+                    CustomerPhone: {required: true, message: '电话不得为空', trigger: 'blur'},
+                    ConsultProjectID: {required: true, message: '咨询项目不得为空', trigger: 'blur'},
+                    ConsultContent: {required: true, message: '咨询项目不得为空', trigger: 'blur'}
+                },
+                formItem: {
+                    startDate: new Date(),
+                    endDate: new Date(),
+                    userTel: '',
+                    userName: ''
+                },
+                columns1: [
+                    {
+                        title: '登记日期',
+                        key: 'ConsultDate',
+                        align: 'center',
+                        width: 180,
+                        render: (h, params) => {
+                            if (!params.row.ConsultDate) {
+                                return ''
+                            }
+                            return h('div', {}, moment(params.row.ConsultDate).format('YYYY-MM-DD HH:mm:ss'))
+                        }
+                    }, {
+                        title: '客户状态',
+                        key: 'CustomerStatusName',
+                        width: 70,
+                        align: 'center'
+                    }, {
+                        title: '客户姓名',
+                        key: 'CustomerName',
+                        width: 110,
+                        align: 'center'
+                    }, {
+                        title: '预约日期',
+                        key: 'ArrivalDate',
+                        width: 120,
+                        align: 'center',
+                        render: (h, params) => {
+                            if (!params.row.ArrivalDate) {
+                                return ''
+                            }
+                            return h('div', {}, moment(params.row.ArrivalDate).format('YYYY-MM-DD HH:mm:ss'))
+                        }
+                    }, {
+                        title: '预约门店',
+                        key: 'BookingStoreName',
+                        width: 170,
+                        align: 'center'
+                    }, {
+                        title: '性别',
+                        key: 'CustomerSex',
+                        width: 70,
+                        align: 'center'
+                    }, {
+                        title: '年龄',
+                        key: 'CustomerAge',
+                        width: 70,
+                        align: 'center'
+                    }, {
+                        title: '电话',
+                        width: 120,
+                        key: 'CustomerPhone',
+                        align: 'center'
+                    }, {
+                        title: '咨询项目',
+                        width: 180,
+                        key: 'ConsultProject',
+                        align: 'center'
+                    }, {
+                        title: '咨询内容',
+                        key: 'ConsultContent',
+                        width: 180,
+                        ellipsis: true,
+                        align: 'center',
+                        render: (h, parmas) => {
+                            if (!parmas.row.ConsultContent) {
+                                return ''
+                            }
+                            let text = parmas.row.ConsultContent.length > 8 ? parmas.row.ConsultContent.substr(0, 7) + '...' : parmas.row.ConsultContent
+                            return h('div', {
+                                on: {
+                                    click: () => {
+                                        this.$Modal.success({
+                                            title: '提示',
+                                            content: parmas.row.ConsultContent
+                                        })
+                                    }
+                                }
+                            }, text)
+                        }
+                    }, {
+                        title: '咨询人',
+                        width: 100,
+                        key: 'ConsultingByName',
+                        align: 'center'
+                    },
+                    {
+                    title: "操作",
+                    width: 100,
+                    align: "center",
+                    render: (h, params) => {
+                        return h("div", [
+                        h("i", {
+                            class: {
+                            "ivu-icon": true,
+                            "ivu-icon-aaa-tianjia": true,
+                            "icon-btn": true
+                            },
+                            on: {
+                            click: () => {
+                                this.ShortAddCharge(params.row.CPhone);
+                                console.log(params.row.CPhone);
+                            }
+                            },
+                            style: {
+                            //marginRight: "20px"
+                            }
+                        }) 
+                        ]);
+                    }
+                    }, 
+                    // {
+                    //     title: '电话',
+                    //     width: 120,
+                    //     key: 'CPhone',
+                    //     align: 'center'
+                    // },
+                     {
+                        title: ' '
+                    }
+                ],
+                list: [],
+                columns2: [{
+                    title: '咨询日期',
+                    key: 'date',
+                    align: 'center'
+                }, {
+                    title: '咨询项目',
+                    key: 'project',
+                    align: 'center'
+                }, {
+                    title: '咨询内容',
+                    key: 'content',
+                    align: 'center',
+                    render: (h, parmas) => {
+                        if (!parmas.row.content) {
+                                return ''
+                            }
+                        let text = parmas.row.content.length > 8 ? parmas.row.content.substr(0, 7) + '...' : parmas.row.content
+                        return h('div', {
+                            on: {
+                                click: () => {
+                                    this.$Modal.success({
+                                        title: '提示',
+                                        content: parmas.row.content
+                                    })
+                                }
+                            }
+                        }, text)
+                   }
+                }],
+                list2: [],
+                zxxmList: []
+            }
+        },
+        computed: {
+            ...mapState({
+                userMes: state => state.app.userMes,
+                tableRows: state => state.app.tableRows,
+                authorList: state => state.app.authorList
+            }),
+            setTableHeight () {
+                let that = this
+                return that.tableHeight
+            }
+        },
+        methods: {
+            showAddPoup () {
+                let that = this
+                that.$refs.searchTelForm.resetFields()
+                that.poupSearchTel = true
+                that.$nextTick(() => {
+                    that.$refs.searchTel.focus()
+                })
+            },
+            setAuthor () {
+                // 判断用户是否有查看客户详情权限
+                let that = this
+                let pageName = that.$route.name
+                let list = that.authorList[pageName]
+                if (list) {
+                    for (let i of list) {
+                        if (i.Name === '增加') {
+                            that.showAdd = i.IsVisible
+                            break
+                        }
+                    }
+                }
+            },
+            ShortAddCharge (CPhone) {
+            let that = this
+            let data = {
+                        "CustomerPhone": CPhone,
+                        "EmployeeID": that.userMes.EmployeeID
+                    }
+                    //that.loading = true
+                    // console.log(data);
+                    api.getCustomerByPhone(data).then((response) => {
+                        let a = {
+                            Name: '',
+                            Age: '',
+                            Phone: data.CustomerPhone,
+                            CustomerSex: ''
+                        }
+                        if (response.error_code === 'Success') {
+                            that.formValidate.CustomerID = response.data.ID
+                            a = response.data
+                            that.customerEnable = true
+                            that.setData(a)
+                            that.getHistroy()
+                        } else {
+                            that.loading = false
+                            that.formValidate.CustomerID = ''
+                            that.customerEnable = false
+                            that.$Message.error(response.error_message)
+                        }
+                    })
+            },
+            searchForm () {
+                // 搜索表格
+                let that = this
+                if (that.formItem.startDate && that.formItem.endDate) {
+                    // 两者同时存在
+                    if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+                        that.$Message.error('开始日期不得大于结束日期')
+                        return false
+                    }
+                }
+                that.tablePage.page = 1
+                that.getList()
+            },
+            resetSearch () {
+                let that = this
+                that.$refs.searchForm.resetFields()
+                that.tablePage.page = 1
+                that.getList()
+            },
+            resetForm () {
+                let that = this
+                that.$refs.formValidate1.resetFields()
+                that.modal1 = false
+            },
+            addForm () {
+                let that = this
+                that.$refs.formValidate1.validate((validate) => {
+                    if (validate) {
+                        that.loading = true
+                        let data = that.formValidate
+                        data.ConsultBy = that.userMes.EmployeeID
+                        api.addConsult(data).then((response) => {
+                            that.loading = false
+                            if (response.error_code === 'Success') {
+                                that.$Message.success('添加成功');
+                                that.$refs.formValidate1.resetFields()
+                                
+                                that.getList()
+                                that.modal1 = false
+                            } else {
+                                that.$Message.error(response.error_message)
+                            }
+                        })
+                    } else {
+                        this.$Message.error('有必填项为空');
+                    }
+                })
+            },
+            searchCustomerTel () {
+                let that = this
+                that.$refs.searchTelForm.validate((validate) => {
+                    if (validate) {
+                        // 搜索...
+                        let data = {
+                            "CustomerPhone": that.searchTel.tel,
+                            "EmployeeID": that.userMes.EmployeeID
+                        }
+                        that.loading = true
+                        api.getCustomerByPhone(data).then((response) => {
+                            let a = {
+                                Name: '',
+                                Age: '',
+                                Phone: data.CustomerPhone,
+                                CustomerSex: ''
+                            }
+                            if (response.error_code === 'Success') {
+                                that.formValidate.CustomerID = response.data.ID
+                                a = response.data
+                                that.customerEnable = true
+                                that.setData(a)
+                                that.getHistroy()
+                            } else {
+                                that.loading = false
+                                that.formValidate.CustomerID = ''
+                                that.customerEnable = false
+                                that.$Message.error(response.error_message)
+                            }
+                        })
+                    } else {
+                        that.$Message.error('请输入用户的联系电话')
+                    }
+                })
+            },
+            setData (res) {
+                let that = this
+                that.formValidate.CustomerName = res.Name
+                that.formValidate.CustomerAge = res.Age
+                that.formValidate.CustomerPhone = res.Phone
+                that.formValidate.CustomerSex = res.Sex
+            },
+            searchReset () {
+                // 查询电话号码
+                let that = this
+                that.$refs.searchTelForm.resetFields()
+                that.poupSearchTel = false
+            },
+            initTableHeight () {
+                let that = this
+                that.tableHeight = document.getElementById('tableBox').offsetHeight
+                window.onresize = function() {
+                    that.tableHeight = document.getElementById('tableBox').offsetHeight
+                }
+            },
+            setPage () {
+                let that = this
+                let teblePage = that.tablePage
+                teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1
+                let endPage = teblePage.page * teblePage.pageNum
+                teblePage.endNum = endPage > teblePage.allNum ? teblePage.allNum : endPage
+            },
+            prevPage () {
+                let that = this
+                if (that.tablePage.page <= 1) {
+                    that.$Message.error('已经是第一页')
+                    return false
+                }
+                that.tablePage.page--
+                that.getList()
+            },
+            nextPage () {
+                let that = this
+                if (that.tablePage.page >= that.tablePage.maxPageNum) {
+                    that.$Message.error('已经是最后一页')
+                    return false
+                }
+                that.tablePage.page++
+                that.getList()
+            },
+            changePage () {
+                let that = this
+                that.getList()
+            },
+            getList () {
+                let that = this
+                let data = {
+                    EmployeeID: that.userMes.EmployeeID,
+                    startDate: that.formItem.startDate,
+                    endDate: that.formItem.endDate,
+                    CustomerName: that.formItem.userName,
+                    CustomerPhone: that.formItem.userTel,
+                    
+                    page: that.tablePage.page,
+                    size: that.tablePage.pageNum
+                }
+                that.tableLoading = true
+                if (data.CustomerPhone) {
+                    let regex = /^1\d{10}$/
+                    if (!regex.test(data.CustomerPhone)) {
+                        that.$Message.error('电话号码格式有误')
+                        return false
+                    }
+                }
+                // 转换日期
+                if (data.startDate) {
+                    data.startDate = moment(data.startDate).format('YYYY-MM-DD')
+                }
+                if (data.endDate) {
+                    data.endDate = moment(data.endDate).format('YYYY-MM-DD')
+                }
+                api.consultGetList(data).then((response) => {
+                    that.tableLoading = false
+                    if (response.error_code === 'Success') {
+                        let res = response.data
+                        for (let i of res.list) {
+                            let phone = i.CustomerPhone
+                            i.CPhone=phone
+                            i.CustomerPhone = phone.substring(0, 3) + '****' + phone.substr(phone.length - 4)
+                        }
+                        that.list = res.list
+                        that.tableLoading = false
+                        that.$set(that.tablePage, 'allNum', res.total)
+                        that.tablePage.maxPageNum = res.totalPage
+                        that.setPage()
+                    } else {
+                        that.$Message.error(response.error_message)
+                    }
+                })
+            },
+            getProjectList () {
+                let that = this
+                api.getValidSubCategories().then((response) => {
+                    if (response.error_code === 'Success') {
+                        let res = response.data
+                        that.zxxmList = res.list
+                    } else {
+                        that.$Message.error(response.error_message)
+                    }
+                })
+            },
+            exportTable () {
+                let that = this
+                that.$refs.mainTable.exportCsv({
+                    filename: `${new Date().getTime()}${document.title}`
+                })
+            },
+            getHistroy () {
+                // 获取顾客历史查询记录
+                let that = this
+                let data = {
+                    CustomerID: that.formValidate.CustomerID
+                }
+                api.getConsultRecordByCustomerID(data).then((response) => {
+                    that.loading = false
+                    that.poupSearchTel = false
+                    that.$refs.searchTelForm.resetFields()
+                    if (response.error_code === 'Success') {
+                        that.list2 = response.data.list
+                        that.modal1 = true
+                    } else {
+                        that.$Message.error(response.error_message)
+                    }
+                })
+            }
+        },
+        mounted () {
+            let that = this
+            that.$nextTick(() => {
+                that.initTableHeight()
+                that.getList()
+                that.getProjectList()
+                that.setAuthor()
+            })
+        },
+        activated () {
+            let that = this
+            that.$nextTick(() => {
+                let phone = that.$route.params.phone
+                if (phone) {
+                    // 快捷菜单
+                    that.searchTel.tel = phone
+                    // that.$store.commit('changeLoadingPage')
+                    setTimeout(() => {
+                        that.searchCustomerTel()
+                    }, 300)
+                }
+            })
+        },
+        filters: {
+            textHide (val) {
+                if (val && val.length >= 9) {
+                    return val.substr(0, 9) + '...'
+                }
+                return val
+            },
+            formatDate (val) {
+                if (val) {
+                    return moment(val).format('YYYY-MM-DD')
+                }
+            }
+        }
+    }
+</script>
+<style>
+</style>
+

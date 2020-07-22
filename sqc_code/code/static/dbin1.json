@@ -1,0 +1,27 @@
+{
+    "error_code": "Success",
+    "error_message": null,
+    "data": [{
+            "ID": 1012,
+            "ProductNum": "00004",
+            "ProductName": "氨基酸深层洁面啫喱",
+            "Unit": "瓶",
+            "Price": 980,
+            "Standard":"666ml",
+            "BarCode": "00004",
+            "BatchNum": "XX220",
+            "LocalName": "的撒噶时光"
+        },
+        {
+            "ID": 1013,
+            "ProductNum": "00002",
+            "ProductName": "红藻水凝保湿面膜",
+            "Unit": "包",
+            "Price": 338,
+            "Standard":"888ml",
+            "BarCode": "00002",
+            "BatchNum": "XX211",
+            "LocalName": "的撒噶时光"
+        }
+    ]
+}

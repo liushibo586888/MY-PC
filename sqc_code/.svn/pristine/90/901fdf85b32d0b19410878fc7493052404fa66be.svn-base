@@ -1,0 +1,1061 @@
+<template>
+  <div class="monthlyScheduling-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false"
+                :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false"
+                :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="18">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+              <Button type="primary" class="btn btn-add" @click="showModal1(1)">添加</Button>
+              <Button type="warning" class="btn" @click="showModal1(0)" style="background:#e9618e; border-color:#e9618e;">修改</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" :height="setTableHeight" ref="mainTable" :loading="tableLoading"></Table>
+    </div>
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+      <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+        <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+      </Select>
+      <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+      <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+      <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+      <div class="page-box">
+        <p>前往</p>
+        <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+        <p>页</p>
+      </div>
+    </div>
+    <!-- 选择排班时间 -->
+    <Modal :mask-closable="false" v-model="modal1" class="dialog">
+      <div slot='header' class="header">选择排班时间</div>
+      <Form ref="formValidate1" :label-width="120" @submit.native.prevent class="form">
+        <FormItem prop="Date" label="选择年月份：">
+          <Date-picker type="month" placeholder="请选择" style="width: 100%" v-model="chooseMonth"></Date-picker>
+        </FormItem>
+      </Form>
+      <div slot="footer" class="footer" style="padding-right:0px;">
+        <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+      </div>
+    </Modal>
+    <!-- 添加月排班 -->
+    <Modal :mask-closable="false" v-model="modal2" class="dialog" width="770">
+      <div slot='header' class="header">添加月排班</div>
+      <div class="month-title">
+        <div style="width:37%">
+          所属门店:{{storeName}}
+        </div>
+        <div style="width:26%">
+          创建人:{{creatorName}}
+        </div>
+        <div style="width:37%">
+          排班月份:
+          <Date-picker type="month" placeholder="选择月" :open="showChooseMonth" confirm @on-ok="changecClendar" style="color:#666; font-size:12px;"
+            v-model="chooseMonth">
+            <p @click="handleClick" style="color:#8CCE4A;font-size:16px;">
+              <template v-if="chooseMonth === ''">选择日期</template>
+              <template v-else>{{ chooseMonth |formatDate }}</template>
+            </p>
+          </Date-picker>
+          <Icon type="chevron-down" style="margin-left:5px;"></Icon>
+        </div>
+      </div>
+      <div class="month-content">
+        <div class="day-box">
+          <div class="day-title">周日</div>
+          <div class="day-title">周一</div>
+          <div class="day-title">周二</div>
+          <div class="day-title">周三</div>
+          <div class="day-title">周四</div>
+          <div class="day-title">周五</div>
+          <div class="day-title">周六</div>
+        </div>
+        <div class="calendar-box">
+          <div class="calendar" v-for="i in calendarList" @click="chooseDay(i)" :class="calendarClasses(i)">
+            <div>{{i.Day}}</div>
+          </div>
+        </div>
+      </div>
+      <div slot="footer" class="footer" style="padding-right:0px;padding-left:0px;">
+        <div class="tips-box">
+          <div class="title">标注：</div>
+          <div class="tips">
+            <div class="dot" style="background:rgb(141, 206, 75)"></div>
+            <div class="text">已完成</div>
+          </div>
+          <div class="tips">
+            <div class="dot" style="background:rgb(252, 184, 38)"></div>
+            <div class="text">未完成</div>
+          </div>
+          <div class="tips">
+            <div class="dot" style="background:#666"></div>
+            <div class="text">空白</div>
+          </div>
+        </div>
+        <Button type="primary" class="btn" @click="addMonth" :loading="loading">保存</Button>
+        <Button type="warning" class="btn" :loading="loading">取消</Button>
+        <!-- <Button type="warning" class="btn" @click="resetAdd" :loading="loading">取消</Button> -->
+      </div>
+    </Modal>
+    <!-- 日排班明细 -->
+    <Modal :mask-closable="false" v-model="modal3" class="dialog dayScheduling" width="770">
+      <div slot='header' class="header">日排班明细</div>
+      <Row style="height:476px;">
+        <i-col span="7" style="height:100%;">
+          <!-- 新增 -->
+          <div class="content" style="height:100%; overflow-y:auto;" v-if="mode == true">
+            <div class="beautician-list" style="width:100%;">
+              <div class="beautician-item" v-for="(i, index) in beauticianList" :class="{'active' : beauticianIndex == i.EmployeeID}" @click="chooseBeautician(i)">
+                <div class="beautician-avatar" style="width:40px;height:40px; border-radius:50%; background-color:#ccc; margin-right:10px;"
+                  :style="{'background': 'url('+ i.Image +') no-repeat center center / cover'}" v-if="i.Image"></div>
+                <div class="beautician-name">{{i.EmployeeName}}</div>
+              </div>
+            </div>
+          </div>
+          <!-- 修改 -->
+          <div class="content" style="height:100%; overflow-y:auto;" v-else>
+            <!-- 未排班 -->
+            <div class="beautician-title">未排班</div>
+            <div class="beautician-list" style="width:100%;">
+              <div class="beautician-item" v-for="(i, index) in 10" :class="{'active' : beauticianIndex == index}" @click="chooseBeautician(i)">
+                <div class="beautician-avatar" style="width:40px;height:40px; border-radius:50%; background-color:#ccc; margin-right:10px;"></div>
+                <div class="beautician-name">美容师123123</div>
+              </div>
+            </div>
+            <!-- 早班 -->
+            <div class="beautician-title">早班</div>
+            <div class="beautician-list" style="width:100%;">
+              <div class="beautician-item" v-for="(i, index) in 10" :class="{'active' : beauticianIndex == index}" @click="chooseBeautician(i)">
+                <div class="beautician-avatar" style="width:40px;height:40px; border-radius:50%; background-color:#ccc; margin-right:10px;"></div>
+                <div class="beautician-name">美容师123123</div>
+              </div>
+            </div>
+            <!-- 晚班 -->
+            <div class="beautician-title">晚班</div>
+            <div class="beautician-list" style="width:100%;">
+              <div class="beautician-item" v-for="(i, index) in 10" :class="{'active' : beauticianIndex == index}" @click="chooseBeautician(i)">
+                <div class="beautician-avatar" style="width:40px;height:40px; border-radius:50%; background-color:#ccc; margin-right:10px;"></div>
+                <div class="beautician-name">美容师123123</div>
+              </div>
+            </div>
+            <!-- 休息 -->
+            <div class="beautician-title">休息</div>
+            <div class="beautician-list" style="width:100%;">
+              <div class="beautician-item" v-for="(i, index) in 10" :class="{'active' : beauticianIndex == index}" @click="chooseBeautician(i)">
+                <div class="beautician-avatar" style="width:40px;height:40px; border-radius:50%; background-color:#ccc; margin-right:10px;"></div>
+                <div class="beautician-name">美容师123123</div>
+              </div>
+            </div>
+          </div>
+        </i-col>
+        <i-col span="17" style="height:100%;">
+          <!-- 选择班次 -->
+          <div class="classes-list">
+            <div class="classes-item" v-for="(item, index) in timeDetailsList" @click="chooseClasses(item)" :key="index" :class="{'actived' : item.ID == classesIndex}">
+              <Icon type="android-radio-button-on" v-if="item.ID == classesIndex"></Icon>
+              <Icon type="android-radio-button-off" v-else></Icon>
+              <p>{{item.ShiftsName}}</p>
+            </div>
+          </div>
+        </i-col>
+      </Row>
+      <div slot="footer" class="footer" style="padding-right:0px;padding-left:0px;">
+        <Button type="primary" class="btn" @click="addScheduleDayInfo" :loading="loading">保存</Button>
+        <Button type="warning" class="btn" :loading="loading" @click="resetSchedule">取消</Button>
+      </div>
+    </Modal>
+  </div>
+</template>
+<script>
+import scheduling from "@/api/scheduling.js";
+// import api from '@/api/index.js'
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    const validateTel = (rule, value, callback) => {
+      let reg = /^1\d{10}$/;
+      console.log("reg.test(value)", reg.test(value));
+      if (value === "") {
+        callback(new Error("手机号不得为空"));
+      } else if (!reg.test(value)) {
+        callback(new Error("请输入正确的手机号"));
+      } else {
+        callback();
+      }
+    };
+    return {
+      //时间回到今天
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      },
+      // -----
+      // true 添加 false修改
+      mode: true,
+      classesIndex: 0,
+      // 存储排班信息
+      nowSchedulingMes: {},
+      storeName: "杭州滨江天河店",
+      creatorName: "豆豆",
+      beauticianIndex: 0,
+      showChooseMonth: false,
+      chooseMonth: new Date(),
+      tableLoading: false,
+      loading: false,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      list: [],
+      tableHeight: 200,
+      modalTitle: "新增",
+      phone: "",
+      modal1: false,
+      modal2: false,
+      modal3: false,
+      formValidate: {
+        Date: new Date()
+      },
+      formValidateRule: {
+        name: {
+          required: true,
+          message: "姓名不得为空",
+          trigger: "blur"
+        },
+        newStoreID: {
+          required: true,
+          message: "现所属门店不得为空",
+          trigger: "blur"
+        },
+        Remark: {
+          required: true,
+          message: "备注不得为空",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date()
+      },
+      columns1: [
+        {
+          title: "排班日期",
+          key: "Date",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.Date) {
+              return "";
+            }
+            return moment(params.row.Date).format("YYYY-MM-DD");
+          }
+        },
+        {
+          title: "创建人",
+          key: "CreateByName",
+          align: "center"
+        },
+        {
+          title: "创建人部门",
+          key: "DepartmentName",
+          align: "center"
+        },
+        {
+          title: "创建日期",
+          key: "CreateDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.CreateDate) {
+              return "";
+            }
+            return moment(params.row.CreateDate).format("YYYY-MM-DD");
+          }
+        },
+        {
+          title: "审核日期",
+          key: "CheckDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.CheckDate) {
+              return "";
+            }
+            return moment(params.row.CheckDate).format("YYYY-MM-DD");
+          }
+        },
+        {
+          title: "审核是否通过",
+          key: "CheckResult",
+          align: "center",
+          render: (h, params) => {
+            if (params.row.CheckResult) {
+              return "是";
+            } else {
+              return "否";
+            }
+          }
+        },
+        {
+          title: "审核人",
+          key: "CheckByName",
+          align: "center"
+        },
+        {
+          title: "是否有效",
+          key: "Valid",
+          align: "center",
+          render: (h, params) => {
+            if (params.row.Valid) {
+              return "是";
+            } else {
+              return "否";
+            }
+          }
+        },
+        {
+          title: "门店名称",
+          key: "StoreName",
+          align: "center"
+        },
+        {
+          title: "编号",
+          key: "ID",
+          align: "center"
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      list: [],
+      calendarList: [],
+      beauticianList: [],
+      timeDetailsList: [],
+      // 日排班班次
+      scheduleDayDetails: [],
+      // 选中的日期列表
+      scheduleDayInfo: [],
+      // 选中的日期当天
+      nowDay: 0
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    calendarClasses(item) {
+      // 设置日历样式
+      return {
+        normal: item.ID,
+        disable: !item.ID,
+        finish: item.ID && item.isFinished
+      };
+    },
+    showModal1(type) {
+      let that = this;
+      // true 添加 false修改
+      that.mode = type > 0 ? true : false;
+      that.modal1 = true;
+    },
+    handleClick() {
+      let that = this;
+      that.showChooseMonth = !that.showChooseMonth;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.getList();
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.CustomerID = res.ID;
+      that.formValidate.CustomerName = res.Name;
+      that.formValidate.CustomerAge = res.Age;
+      that.formValidate.CustomerPhone = res.Phone;
+      that.formValidate.oldStore = res.StoreName;
+    },
+    addForm() {
+      let that = this;
+      that.getCalendar();
+      that.modal1 = false;
+      // that.loading = true
+      // 选择日期
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        date: moment(that.chooseMonth).format("YYYY-MM")
+      };
+      scheduling
+        .getMonthScheduleInfoByEmployeeIDAndDate(data)
+        .then(response => {
+          that.loading = false;
+          that.mode
+            ? that.addScheduling(response)
+            : that.editScheduling(response);
+          // if (response.error_code === 'Success') {
+          //   console.log(response)
+          //
+          // } else {
+          //   this.$Message.error(response.error_message);
+          // }
+        });
+    },
+    addScheduling(response) {
+      // 添加月
+      let that = this;
+      if (response.error_code != "Success") {
+        that.modal2 = true;
+      } else {
+        that.$Message.error("该月已排班");
+      }
+    },
+    editScheduling(response) {
+      // 添加月
+      let that = this;
+      if (response.error_code == "Success") {
+        that.modal2 = true;
+      } else {
+        that.$Message.error(response.error_message);
+      }
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    getCalendar() {
+      // 设置月排班日历
+      let that = this;
+      let date = moment(that.chooseMonth).format("YYYY-MM");
+      date += "-01";
+      let prevMonth = new Date(date).getMonth();
+      let weekDay = new Date(date).getDay();
+      // 获取上个月数据
+      let arr = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      // 判断是否二月 闰年
+      let prevEnd = arr[prevMonth];
+      if (prevMonth == 2) {
+        let year = new Date(date).getFullYear();
+        if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) {
+          // 闰年
+          prevEnd = 29;
+        }
+      }
+      let prevStart = arr[prevMonth] - weekDay + 1;
+      that.calendarList = [];
+      // 填写上月
+      for (let i = prevStart; i <= prevEnd; i++) {
+        let data = {
+          Day: i,
+          isFinished: false,
+          ID: null
+        };
+        that.calendarList.push(data);
+      }
+      // 填写当月
+      that.scheduleDayInfo = [];
+      for (let i = 1; i <= arr[prevMonth + 1]; i++) {
+        let data = {
+          Day: i,
+          isFinished: false,
+          ID: "01023132"
+        };
+        that.calendarList.push(data);
+        let b = {
+          Day: i,
+          scheduleDayDetails: []
+        };
+        that.scheduleDayInfo.push(b);
+      }
+      // 补全尾部
+      let len = 35 - that.calendarList.length;
+      for (let i = 1; i <= len; i++) {
+        let data = {
+          Day: i,
+          isFinished: false,
+          ID: ""
+        };
+        that.calendarList.push(data);
+      }
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    chooseDay(item) {
+      // 显示日排班
+      // todo
+      let that = this;
+      if (!item.ID) {
+        return false;
+      }
+      that.nowDay = item.Day;
+      that.nowSchedulingMes.day =
+        moment(that.chooseMonth).format("YYYY-MM") + "-" + item.Day;
+      if (that.mode) {
+        // 添加
+        that.getAddBeauticianList();
+      } else {
+        // 修改
+        // that.editBeauticianList()
+      }
+      that.modal3 = true;
+    },
+    getAddBeauticianList() {
+      // 添加排班表时获取美容师列表
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      scheduling.getNeedToScheduleEmployee(data).then(response => {
+        if (response.error_code === "Success") {
+          that.beauticianList = response.data.list;
+          // 设置数据
+          for (let i of that.beauticianList) {
+            let person = {
+              EmployeeID: i.EmployeeID,
+              WorkHoursID: ""
+            };
+            that.scheduleDayInfo[that.nowDay - 1].scheduleDayDetails.push(
+              person
+            );
+          }
+          that.chooseBeautician(response.data.list[0]);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getScheduleTimeDetailsByEmployeeID(id) {
+      // 获取右侧排班时间
+      let that = this;
+      let data = {
+        EmployeeID: id,
+        Date: that.nowSchedulingMes.day
+      };
+      scheduling.getScheduleTimeDetailsByEmployeeID(data).then(response => {
+        if (response.error_code === "Success") {
+          that.timeDetailsList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    chooseBeautician(item) {
+      // 获取右侧排班时间
+      // 选择美容师
+      let that = this;
+      that.beauticianIndex = item.EmployeeID;
+      that.classesIndex = "";
+      let data = {
+        EmployeeID: item.EmployeeID
+      };
+      scheduling.getValidWorkHoursDefintion(data).then(response => {
+        if (response.error_code === "Success") {
+          that.timeDetailsList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    changecClendar() {
+      // 改变日历
+      let that = this;
+      that.scheduleDayDetails = [];
+      that.scheduleDayInfo = [];
+      that.classesIndex = null;
+      that.beauticianIndex = null;
+      that.showChooseMonth = false;
+      that.getCalendar();
+    },
+    getList() {
+      let that = this;
+      that.tableLoading = true;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        StartDate: that.formItem.StartDate,
+        endDate: that.formItem.endDate,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum
+      };
+      scheduling.getMonthScheduleInfoList(data).then(response => {
+        that.tableLoading = false;
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.list = res.list;
+          that.$set(that.tablePage, "page", res.page);
+          that.$set(that.tablePage, "allNum", res.total);
+          that.tablePage.maxPageNum = res.totalPage;
+          that.setPage();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    chooseClasses(item) {
+      // 选择班次
+      let that = this;
+      let a = {
+        EmployeeID: that.beauticianIndex,
+        WorkHours: item.ID
+      };
+      that.classesIndex = item.ID;
+      that.scheduleDayDetails.push(a);
+    },
+    addScheduleDayInfo() {
+      // 点击保存后将排班信息存入当天
+      let that = this;
+      let arr = that.scheduleDayInfo[that.nowDay - 1].scheduleDayDetails;
+      for (let i of that.scheduleDayDetails) {
+        for (let j in arr) {
+          if (arr[j].EmployeeID == i.EmployeeID) {
+            arr[j] = i;
+          }
+        }
+      }
+      that.resetSchedule();
+    },
+    resetSchedule() {
+      let that = this;
+      that.scheduleDayDetails = [];
+      that.modal3 = false;
+    },
+    addMonth() {
+      let that = this;
+      let data = {
+        Date: moment(that.chooseMonth).format("YYYY-MM"),
+        CreateBy: that.userMes.EmployeeID,
+        ScheduleDayInfo: that.scheduleDayInfo
+      };
+      scheduling.addEmployeeSchedules(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("添加成功");
+          that.scheduleDayDetails = [];
+          that.scheduleDayInfo = [];
+          that.classesIndex = null;
+          that.beauticianIndex = null;
+          that.modal1 = false;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+    });
+  },
+  filters: {
+    formatDate(val) {
+      return moment(val).format("YYYY-MM");
+    }
+  }
+};
+</script>
+<style>
+.footer .tips-box {
+  position: absolute;
+  width: 50%;
+  left: 0;
+  height: 24px;
+  overflow: hidden;
+}
+
+.footer .tips-box > div {
+  float: left;
+  width: 14%;
+  overflow: hidden;
+  font-size: 0;
+  line-height: 24px;
+}
+
+.footer .tips-box .text {
+  float: left;
+}
+
+.footer .tips-box > .title,
+.footer .tips-box > .tips {
+  line-height: 24px;
+  font-size: 12px;
+  margin-right: 5px;
+  color: #666;
+}
+
+.footer .tips-box .dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: green;
+  margin-right: 4px;
+  float: left;
+}
+
+.month-title {
+  position: relative;
+  width: 72%;
+  height: 57px;
+  background: #fff;
+  box-shadow: 1px 0 6px rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.month-title > div {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #8cce4a;
+  font-size: 16px;
+  text-align: center;
+}
+
+.month-title > div:nth-child(2):before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 37px;
+  background: #8cce4a;
+  left: 0;
+  top: -5px;
+}
+
+.month-title > div:nth-child(2):after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 37px;
+  background: #8cce4a;
+  right: 0;
+  top: -5px;
+}
+
+.month-content {
+  position: relative;
+  margin-top: 12px;
+  border: 1px solid #f5f5f5;
+  height: 480px;
+}
+
+.day-box {
+  width: 100%;
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.day-title {
+  width: 82px;
+  height: 82px;
+  line-height: 82px;
+  font-size: 16px;
+  color: #8cce4a;
+  text-align: center;
+  box-shadow: 1px 0 6px rgba(0, 0, 0, 0.08);
+}
+
+.calendar-box {
+  position: relative;
+  margin-top: 30px;
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  height: 370px;
+}
+
+.calendar {
+  width: 14.2%;
+  height: 46px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.calendar > div {
+  width: 46px;
+  height: 46px;
+  line-height: 46px;
+  text-align: center;
+  font-size: 18px;
+  border-radius: 50%;
+  background: #666;
+  color: #fff;
+  cursor: pointer;
+}
+
+.calendar.disable > div {
+  background: rgb(245, 245, 245);
+  color: rgb(128, 128, 128);
+}
+
+.calendar > div:hover {
+  transform: scale(0.9, 0.9);
+}
+
+/****/
+
+/*日排班左侧*/
+
+.dayScheduling .beautician-list {
+  position: relative;
+}
+
+.storeName {
+  position: absolute;
+  top: 0;
+  padding: 8px;
+  background: #8ab95d;
+  color: #fff;
+}
+
+.dayScheduling .beautician-item {
+  position: relative;
+  width: 92%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  border-bottom: 1px solid #f6f6f6;
+  margin: 16px auto 0 auto;
+  box-shadow: 0px 0px 6px rgba(0, 0, 0, 0.14);
+  padding-right: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dayScheduling .beautician-item.active {
+  color: #8cce4a;
+}
+
+.dayScheduling .beautician-item:first-child {
+  margin-top: 5px;
+}
+
+.dayScheduling .beautician-item:hover {
+  border-bottom: 1px solid #f6f6f6;
+  color: #8cce4a;
+}
+
+.dayScheduling .classes-item.actived:after,
+.dayScheduling .beautician-item:after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 100%;
+  top: 0;
+  right: 0;
+  background: #666666;
+  transition: all 0.2s;
+  border-radius: 0 3px 3px 0;
+}
+
+.dayScheduling .classes-item.actived:after,
+.dayScheduling .beautician-item.active:after {
+  background: #8cce4a;
+}
+
+.dayScheduling .beautician-timer {
+  width: 100%;
+  height: 100%;
+  padding-top: 60px;
+}
+
+.dayScheduling .beautician-timer .title-box {
+  height: 47px;
+  line-height: 47px;
+  position: absolute;
+  top: 0;
+  text-align: center;
+  width: 100%;
+  border-bottom: 1px solid #f6f6f6;
+}
+
+.dayScheduling .beautician-timer .content {
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dayScheduling .beautician-timer .item {
+  display: flex;
+  align-items: center;
+  width: 25%;
+  margin-bottom: 36px;
+  cursor: pointer;
+}
+
+.dayScheduling .beautician-timer .item {
+  color: rgb(102, 102, 102);
+  font-size: 12px;
+}
+
+.dayScheduling .beautician-timer i {
+  font-size: 18px;
+  margin-right: 6px;
+}
+
+.dayScheduling .beautician-timer .item:hover {
+  color: #8cce4a;
+}
+
+.dayScheduling .beautician-timer .item.disable .text {
+  color: #999;
+  text-decoration: line-through;
+}
+
+.dayScheduling .beautician-timer .item.disable:hover {
+  color: #999;
+}
+
+.dayScheduling .beautician-title {
+  height: 48px;
+  width: 90%;
+  border-radius: 3px;
+  margin: 15px auto 20px auto;
+  box-shadow: 0 0 7px rgba(0, 0, 0, 0.14);
+  text-align: center;
+  line-height: 48px;
+  color: #79aa49;
+}
+
+.dayScheduling .content {
+  box-shadow: 0 0 7px rgba(0, 0, 0, 0.14);
+  border-radius: 3px;
+}
+
+.dayScheduling .classes-list {
+  position: relative;
+  width: 98%;
+  height: 100%;
+  margin: 0 auto;
+  overflow-y: auto;
+}
+
+.dayScheduling .classes-list > div {
+  height: 68px;
+  width: 96%;
+  margin: 14px auto 14px auto;
+  box-shadow: 0 0 7px rgba(0, 0, 0, 0.14);
+  border-radius: 2px;
+}
+
+.dayScheduling .classes-item {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #333;
+  font-size: 16px;
+  transition: all 0.3s;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.dayScheduling .classes-item i {
+  font-size: 24px;
+  margin-right: 25px;
+  color: #6b6b6b;
+}
+
+.dayScheduling .classes-item.actived,
+.dayScheduling .classes-item.actived i,
+.dayScheduling .classes-item:hover i,
+.dayScheduling .classes-item:hover {
+  color: #8cce4a;
+}
+</style>

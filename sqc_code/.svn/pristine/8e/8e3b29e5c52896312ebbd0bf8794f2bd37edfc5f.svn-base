@@ -1,0 +1,46 @@
+import axios from 'axios';
+import storejs from 'storejs';
+// axios.defaults.baseURL = 'https://wsj.sqcyouth.com:444/api';
+// axios.defaults.baseURL = 'http://192.168.0.20:8080/api';
+axios.defaults.baseURL = 'http://192.168.1.9:1188/api'; //李炎
+// axios.defaults.baseURL = 'http://192.168.1.9:55958/api'; //李炎--联调
+// axios.defaults.baseURL = 'http://192.168.1.68:8080/api'; //孙永
+//  axios.defaults.baseURL = 'http://localhost:55958/api'; //孙永--联调
+//  axios.defaults.baseURL = 'http://localhost:5800/api'; //孙永--本地正式服
+// 接口
+axios.interceptors.response.use(function (response) {
+  return response.data
+}, function (response) {})
+
+axios.interceptors.request.use(function (options) {
+
+    // let daytime = new Date();
+    // var loginTime= sessionStorage.getItem("loginTime");
+    // if(loginTime==null||loginTime=="2019"){
+    //   loginTime= new Date();
+    // }
+    // var stime = new Date(daytime).getTime();
+    // var etime = new Date(loginTime).getTime();
+    // var usedTime = stime - etime; //两个时间戳相差的毫秒数
+    // var days = Math.floor(usedTime / (24 * 3600 * 1000));
+    // //计算出小时数
+    // var leave1 = usedTime % (24 * 3600 * 1000); //计算天数后剩余的毫秒数
+    // // var hours = Math.floor(leave1 / (3600 * 1000));
+
+    // var leave2 = leave1 % (3600 * 1000); //计算小时数后剩余的毫秒数
+    // var minutes = Math.floor(leave2 / (60 * 1000));
+    // if (minutes >= 1) {
+    //   sessionStorage.setItem("loginTime","2019");
+    //   this.$router.push({
+    //     name: "login"
+    //   });
+    // }
+  // 登录成功后的所有请求加上access_token
+  // if (localStorage.hasOwnProperty(config.TOKEN_KEY)) {
+  if (storejs.has('userMessage')) {
+    options.headers['Authorization'] = 'Bear ' + storejs.get('userMessage').Token
+  }
+  return options
+}, function (error) {
+  return Promise.reject(error)
+})

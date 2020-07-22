@@ -1,0 +1,186 @@
+<!-- 成单率柱形图 -->
+<template>
+  <div class="jyshD-container container">
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          客单价柱形图
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+export default {
+  props: ["startDate", "endDate", "storeID"],
+  data() {
+    return {
+      spinShow: true
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StartDate: that.startDate,
+          EndDate: that.endDate,
+          StoreId: that.storeID
+        };
+        data.StartDate = echartsCommon.changeTime(data.StartDate);
+        data.EndDate = echartsCommon.changeTime(data.EndDate);
+        that.tableLoading = true;
+        that.spinShow = true;
+        api.CustmerConsumeItemReport(data).then(response => {
+          that.tableLoading = false;
+          if (response.error_code === "Success") {
+            that.list = response.data;
+            that.setPieData();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    setPieData() {
+      let that = this;
+      let pieData = [];
+      let barName = [];
+      for (let i in that.list) {
+        var a = {
+          Rate: that.list[i].Rate.toFixed(2),
+          name: that.list[i].CateType
+        };
+        pieData.push(a.Rate);
+        barName.push(a.name);
+      }
+      that.setEcharts(pieData, barName);
+    },
+    setEcharts(pieData, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          color: [echartsCommon.color()],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              type: "shadow"
+            }
+          },
+          toolbox: {
+            show: true,
+            orient: "vertical",
+            left: "right",
+            top: "center",
+            feature: {
+              mark: { show: true },
+              dataView: { show: true, readOnly: false },
+              magicType: {
+                show: true,
+                type: ["line", "bar", "stack", "tiled"]
+              },
+              restore: { show: true },
+              saveAsImage: { show: true }
+            }
+          },
+          calculable: true,
+          xAxis: [
+            {
+              type: "category",
+              axisTick: { show: false },
+              data: barName,
+              axisLabel: echartsCommon.axisLabel()
+            }
+          ],
+          yAxis: [
+            {
+              type: "value"
+            }
+          ],
+          series: [
+            {
+              // name: "第一时间段",
+              type: "bar",
+              barGap: "5%", //柱间距
+              data: pieData,
+              itemStyle: echartsCommon.itemStyle(10),
+              markLine: {
+                data: [
+                  { type: "average", name: "平均值" },
+                  { type: "max", name: "最大值" }
+                ]
+              }
+            }
+          ]
+        };
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+  },
+  watch: {
+    startDate(val, oldVal) {
+      this.getList();
+    },
+    endDate(val1, oldVal1) {
+      this.getList();
+    },
+    storeID(val2, oldVal2) {
+      this.getList();
+    }
+  }
+};
+</script>
+<style>
+</style>
+

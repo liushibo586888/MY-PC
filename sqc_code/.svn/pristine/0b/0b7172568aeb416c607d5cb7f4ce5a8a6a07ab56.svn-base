@@ -1,0 +1,23 @@
+import axios from 'axios';
+import storejs from 'storejs';
+//axios.defaults.baseURL = 'https://wsj.sqcyouth.com:444/api';
+// axios.defaults.baseURL = 'http://192.168.0.20:8080/api';
+// axios.defaults.baseURL = 'http://192.168.0.137:1188/api'; //李岩
+// axios.defaults.baseURL = 'http://192.168.0.112:8080/api'; //孙勇
+axios.defaults.baseURL = 'http://192.168.0.200:80/api'; //小明
+// axios.defaults.baseURL = 'http://localhost:55958/api';
+// 接口
+axios.interceptors.response.use(function (response) {
+  return response.data
+}, function (response) {})
+
+axios.interceptors.request.use(function (options) {
+  // 登录成功后的所有请求加上access_token
+  // if (localStorage.hasOwnProperty(config.TOKEN_KEY)) {
+  if (storejs.has('userMessage')) {
+    options.headers['Authorization'] = 'Bear ' + storejs.get('userMessage').Token
+  }
+  return options
+}, function (error) {
+  return Promise.reject(error)
+})

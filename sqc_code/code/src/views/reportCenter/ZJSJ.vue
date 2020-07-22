@@ -1,0 +1,601 @@
+ <template>
+  <div class="QYjysh-container container">
+    <div>
+      <Tabs value="MFZJYE" @on-click="tabChangeQYjysh">
+        <TabPane label="美肤总监业绩" icon="dot" name="MFZJYE">
+          <keep-alive>
+            <template v-if="tabIndex2=='MFZJYE'">
+              <MFZJYEDemo :date="date1" :vall="val" :startDate="startDate" :endDate="endDate" :sCity="sCity" :MDid="MDid" :choosedItemList="choosedItemList1" :storeList="storeList"></MFZJYEDemo>
+            </template>
+          </keep-alive>
+        </TabPane>
+
+        <TabPane label="美肤总监顾客业绩" icon="dot" name="ZJGKYJ">
+          <keep-alive>
+            <template v-if="tabIndex2=='ZJGKYJ'">
+              <ZJGKYJDemo :date="date1" :vall="val" :startDate="startDate" :endDate="endDate" :sCity="sCity" :MDid="MDid" :choosedItemList="choosedItemList1" :storeList="storeList"></ZJGKYJDemo>
+            </template>
+          </keep-alive>
+        </TabPane>
+
+        <TabPane label="美肤总监项目分类" icon="dot" name="ZJXMFL">
+          <keep-alive>
+            <template v-if="tabIndex2=='ZJXMFL'">
+              <ZJXMFLDemo :date="date1" :vall="val" :startDate="startDate" :endDate="endDate" :sCity="sCity" :MDid="MDid" :choosedItemList="choosedItemList1" :storeList="storeList">
+              </ZJXMFLDemo>
+            </template>
+          </keep-alive>
+        </TabPane>
+
+      </Tabs>
+    </div>
+
+    <!-- <div class="QYjysh-container container"> -->
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="sCityName">
+              <Select v-model="formItem.sCityName" placeholder="区域" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="MDid">
+              <Select v-model="formItem.MDName" placeholder="门店" :filterable="true" :rule='formItemRule.MDid'>
+                <Option v-for="item in CityList" :value="item.Name" :key="item.ID" @click.native="chooseMD(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <!-- <i-col span="3">
+            <formItem prop="endDate">
+              <Select v-model="val" placeholder="对比条件" :filterable="true" @on-change='TJchange'>
+                <Option :value='1'>美肤总监</Option>
+                <Option :value='2'>护理师</Option>
+              </Select>
+            </formItem>
+          </i-col> -->
+          <i-col span='12'>
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="searchList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+              <Button type="success" class="btn" @click="anniu">时间同步</Button>
+              <Button type="error" class="btn" @click="duibi">+对比</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+
+    <div class="ZYJ_vue" v-show="isshow">
+      <div class="table-box" style="margin-top:0; margin-bottom:200px;">
+        <i-table stripe :columns="choosedItemColumns" :data="choosedItemList" :width="900" :height='460'></i-table>
+      </div>
+    </div>
+
+  </div>
+</template>
+<script>
+import { mapState } from "vuex";
+import moment from "moment";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+import MFZJYEDemo from "../reportCenter/ZJSJchildren/MFZJYJ";
+import ZJGKYJDemo from "../reportCenter/ZJSJchildren/ZJGKYJ";
+import ZJXMFLDemo from "../reportCenter/ZJSJchildren/ZJXMFL";
+export default {
+  data() {
+    return {
+      date1: 0,
+      date2: 0,
+      startDate: new Date(),
+      endDate: new Date(),
+      sCity: "",
+      MDid: "",
+      choosedItemList1: [],
+      storeList: [],
+      vall: 1,
+      tabIndex2: "MFZJYE",
+      DBdisabled: true,
+      spinShow: true,
+      span: 15,
+      val: 1,
+      disabled: true,
+      display: "inline-block",
+      MDisshow: false,
+      QYisshow: false,
+      isshow: false,
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        sCity: "",
+        sCityName: "",
+        MDid: "",
+        MDName: ""
+      },
+      formItemRule: {
+        MDid: {
+          required: true,
+          message: "店名不得为空",
+          trigger: "blur"
+        }
+      },
+      choosedItemColumns: [
+        {
+          title: "开始时间",
+          align: "center",
+          key: "startDate",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("DatePicker", {
+                class: "DatePicker_time",
+                props: {
+                  clearable: false,
+                  editable: false,
+                  options: that.options1,
+                  value: that.choosedItemList[params.index].startDate,
+                  "label-in-value": true
+                },
+                on: {
+                  "on-change": event => {
+                    that.date2++;
+                    params.row.startDate = event;
+                    that.choosedItemList[params.index].startDate = event;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "结束时间",
+          align: "center",
+          key: "endDate",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("DatePicker", {
+                class: "DatePicker_time",
+                props: {
+                  clearable: false,
+                  editable: false,
+                  options: that.options1,
+                  value: that.choosedItemList[params.index].endDate,
+                  "label-in-value": true
+                },
+                on: {
+                  "on-change": event => {
+                    that.date2++;
+                    params.row.endDate = event;
+                    that.choosedItemList[params.index].endDate = event;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "区域",
+          align: "center",
+          key: "areaID",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Select",
+                {
+                  props: {
+                    value: that.choosedItemList[params.index].areaID,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      that.date2++;
+                      params.row.areaID = event.value;
+                      that.choosedItemList[params.index].areaID = event.value;
+                      let data = {
+                        sCity: params.row.areaID,
+                        employeeId: that.userMes.EmployeeID
+                      };
+                      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+                        if (response.error_code === "Success") {
+                          that.choosedItemList[params.index].arr =
+                            response.data.list;
+                          if (this.val == 3) {
+                            that.choosedItemList[params.index].storeID =
+                              that.choosedItemList[params.index].arr[0].ID;
+                          } else {
+                            that.choosedItemList[params.index].storeID = "";
+                          }
+                        } else {
+                          that.$Message.error(response.error_message);
+                        }
+                      });
+                    }
+                  }
+                },
+                that.storeList.map(function(type) {
+                  return h(
+                    "Option",
+                    {
+                      props: {
+                        value: type.ID
+                      }
+                    },
+                    type.Name
+                  );
+                })
+              )
+            ]);
+          }
+        },
+        {
+          title: "门店",
+          align: "center",
+          key: "storeID",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h(
+                "Select",
+                {
+                  props: {
+                    // disabled: this.disabled,
+                    value: that.choosedItemList[params.index].storeID,
+                    "label-in-value": true
+                  },
+                  on: {
+                    "on-change": event => {
+                      that.date2++;
+                      params.row.storeID = event.value;
+                      that.choosedItemList[params.index].storeID = event.value;
+                    }
+                  }
+                  // style: {
+                  //   display: this.val == 0 ? "none" : "inline-block"
+                  // }
+                },
+                that.choosedItemList[params.index].arr.map(function(type) {
+                  return h(
+                    "Option",
+                    {
+                      props: {
+                        value: type.ID
+                      }
+                    },
+                    type.Name
+                  );
+                })
+              )
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          align: "center",
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-tianjia": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.addCharge(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "20px"
+                }
+              }),
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "5px"
+                }
+              })
+            ]);
+          }
+        }
+      ],
+      choosedItemList: [],
+      storeList: [],
+      CityList: [],
+      CityList1: [],
+      list: [],
+      CategoryList: [],
+      zxxmList: [],
+      UnderstandWayList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    })
+  },
+  methods: {
+    chooseQD(name, id) {
+      let that = this;
+      if (name === undefined && id === undefined) {
+        that.formItem.UnderstandWay = "所有渠道";
+        that.formItem.UnderstandWayID = null;
+      } else {
+        that.formItem.UnderstandWay = name;
+        that.formItem.UnderstandWayID = id;
+      }
+    },
+    choose1(name, id) {
+      let that = this;
+      that.formItem.ItemId = id;
+    },
+    chooseCategory(name, id) {
+      let that = this;
+      if (name === undefined && id === undefined) {
+        that.formItem.CategoryName = "所有物资";
+        that.formItem.CategoryID = null;
+      } else {
+        that.formItem.CategoryName = name;
+        that.formItem.CategoryID = id;
+      }
+    },
+    tabChangeQYjysh(name) {
+      let that = this;
+      that.tabIndex2 = name;
+    },
+
+    anniu() {
+      let that = this;
+      let arr = that.choosedItemList;
+      arr.forEach(v => {
+        v.startDate = moment(that.formItem.startDate).format("YYYY-MM-DD");
+        v.endDate = moment(that.formItem.endDate).format("YYYY-MM-DD");
+      });
+      that.date2++;
+    },
+    choose(name, id) {
+      let that = this;
+      that.formItem.sCity = id;
+      that.getCity();
+    },
+    chooseMD(name, id) {
+      let that = this;
+      that.formItem.MDid = id;
+    },
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    duibi() {
+      let that = this;
+      that.isshow = !that.isshow;
+      // that.isshow = true;
+      if (that.choosedItemList.length == 0) {
+        that.choosedItemList = [
+          {
+            startDate: moment(that.formItem.startDate).format("YYYY-MM-DD"),
+            endDate: moment(that.formItem.endDate).format("YYYY-MM-DD"),
+            areaID: "17",
+            storeID: "00001",
+            arr: that.CityList1
+          }
+        ];
+      }
+    },
+    TJchange(val) {
+      let that = this;
+      that.val = val;
+      // that.formItem.MDid = "";
+      // that.choosedItemList = [];
+    },
+    showDelDetailPoup(index) {
+      let that = this;
+      that.choosedItemList.splice(index, 1);
+    },
+    addCharge(index) {
+      let that = this;
+
+      let a1 = {
+        startDate: moment(that.formItem.startDate).format("YYYY-MM-DD"),
+        endDate: moment(that.formItem.endDate).format("YYYY-MM-DD"),
+        areaID: "17",
+        storeID: "00001",
+        arr: that.CityList1
+      };
+      that.choosedItemList.push(a1);
+    },
+    searchList() {
+      let that = this;
+      //判断两个时间段大小
+    
+      if (
+        echartsCommon.ContrastTime(
+          this.$Message,
+          that.formItem.startDate,
+          that.formItem.endDate
+        )
+      ) {
+        that.date1 = that.date2;
+        that.startDate = that.formItem.startDate;
+        that.endDate = that.formItem.endDate;
+        that.sCity = that.formItem.sCity;
+        that.MDid = that.formItem.MDid;
+        that.choosedItemList1 = that.choosedItemList;
+        that.storeList = that.storeList;
+        that.vall = that.val;
+        that.isshow = false;
+      }
+    },
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.val = "";
+    },
+    // 获取区域列表
+    getStore() {
+      let that = this;
+      let data = {
+        employeeId: that.userMes.EmployeeID,
+        sCity: ""
+      };
+      api.NewGetAllCityInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.sCityName = that.storeList[0].Name;
+          that.formItem.sCity = that.storeList[0].ID;
+          that.sCity = that.storeList[0].ID;
+          that.getCity();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取有效门店
+    getCity() {
+      let that = this;
+      let data = {
+        sCity: that.formItem.sCity,
+        employeeId: that.userMes.EmployeeID
+      };
+      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.CityList = response.data.list;
+          that.formItem.MDid = that.CityList[0].ID;
+          that.formItem.MDName = that.CityList[0].Name;
+          that.MDid = that.CityList[0].ID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getCity1() {
+      let that = this;
+      let data = {
+        sCity: "17",
+        employeeId: that.userMes.EmployeeID
+      };
+      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.CityList1 = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getStore();
+    that.getCity1();
+  },
+  components: {
+    MFZJYEDemo,
+    ZJGKYJDemo,
+    ZJXMFLDemo
+  }
+};
+</script>
+<style>
+.QYjysh-container {
+  width: 100%;
+  position: relative;
+  padding: 72px 0px;
+  background: #f0f0f0;
+  overflow: visible !important;
+}
+.QYjysh-container .ivu-tabs-nav .ivu-tabs-tab .ivu-icon.ivu-icon-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e9eaec;
+}
+.QYjysh-container .ivu-tabs-tab-active .ivu-icon.ivu-icon-dot {
+  background: #79aa49 !important;
+}
+.QYjysh-container .ivu-tabs {
+  margin-top: -72px;
+}
+.QYjysh-container .ivu-tabs .ivu-tabs-tabpane {
+  margin-top: -27px;
+}
+
+.QYjysh-container .search-box {
+  border-radius: 5px;
+  background: #fff;
+  padding: 10px 20px;
+  top: 35px;
+  /* margin-top: 20px; */
+}
+.QYjysh-container .header {
+  position: absolute;
+  padding-left: 22px;
+  font-size: 14px;
+  height: 40px;
+  line-height: 40px;
+  top: 0;
+  width: 100%;
+  left: 0;
+}
+.QYjysh-container .form-box {
+  background: #f0f0f0;
+  height: 480px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+.QYjysh-container .form-box > .charts {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  width: 20%;
+  padding-top: 40px;
+  height: 100%;
+  flex: 1;
+}
+.QYjysh-container .form-box .content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.QYjysh-container #data_source_com,
+.QYjysh-container #data_source_fb {
+  height: 100%;
+  width: 100%;
+}
+.ZYJ_vue {
+  position: absolute;
+  z-index: 10;
+  right: 10px;
+  top: 110px;
+  margin-bottom: 200px;
+  /* margin-top: 100px; */
+}
+</style> 

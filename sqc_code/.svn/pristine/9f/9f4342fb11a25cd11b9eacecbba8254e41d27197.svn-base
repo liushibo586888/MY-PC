@@ -1,0 +1,182 @@
+<template>
+    <div class="zfmx-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="StartDate">
+                            <DatePicker type="date" placeholder="开始日期" class="DatePicker_time" :options="options1" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="EndDate">
+                            <DatePicker type="date" placeholder="结束日期" class="DatePicker_time" :options="options1" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="store">
+                            <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="15">
+                        <formItem class="btn-box">
+                            <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+                            <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <div style="margin:200px 0 0 300px">
+                <Button type="primary" @click="exportTable">收入成本报表</Button>
+                <Button type="info">Info</Button>
+                <Button type="success">Success</Button>
+                <Button type="warning">Warning</Button>
+                <Button type="error">Error</Button>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import axios from "axios";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    return {
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      tableLoading: true,
+      tableHeight: 40,
+      formItem: {
+        StartDate: new Date(),
+        EndDate: new Date(),
+        StoreID: null,
+        EmployeeID: "",
+        userTel: "",
+        store: "all"
+      },
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    exportTable() {
+      let that = this;
+      that.formItem.StartDate = moment(that.formItem.StartDate).format(
+        "YYYY-MM-DD"
+      );
+      that.formItem.EndDate = moment(that.formItem.EndDate).format(
+        "YYYY-MM-DD"
+      );
+      window.location.href =
+        axios.defaults.baseURL +
+        "/Export/ExportEarn?StartDate=" +
+        that.formItem.StartDate +
+        "&EndDate=" +
+        that.formItem.EndDate +
+        "&StoreId=" +
+        that.formItem.StoreID;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+
+      //判断两个时间段大小
+      echartsCommon.message = that.$Message;
+      if (
+        echartsCommon.ContrastTime(
+          that.formItem.StartDate,
+          that.formItem.EndDate
+        )
+      ) {
+        that.getList();
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StoreId: that.formItem.StoreID,
+          StartDate: that.formItem.StartDate,
+          EndDate: that.formItem.EndDate
+        };
+        data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        api.ExportExportEarn(data).then(response => {
+          if (response.error_code === "Success") {
+            that.$Message.error(response.data);
+            that.tableLoading = false;
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getValidStoresNew(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          that.formItem.store = that.userMes.StoreName;
+          that.formItem.StoreID = that.userMes.StoreID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    choose(name, id) {
+      this.formItem.store = name;
+      this.formItem.StoreID = id;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getStore();
+      that.getList();
+    });
+  }
+};
+</script>
+<style>
+</style>
+
+

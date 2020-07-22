@@ -1,0 +1,807 @@
+<template>
+    <div class="qdxd-container container">
+        <Spin size="large" fix v-if="pageLoading"></Spin>
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker type="date" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker type="date" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userName">
+                            <Input v-model="formItem.userName" placeholder="姓名"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userTel">
+                            <Input v-model="formItem.userTel" placeholder="电话"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <formItem class="btn-box">
+                            <i-button type="primary" class="btn" @click="searchForm" :loading="loading">搜索</i-button>
+                            <i-button type="warning" class="btn" @click="resetSearch" :loading="loading">重置</i-button>
+                            <i-button type="primary" class="btn btn-add" @click="showAddPoup" :loading="loading" v-if="showAdd">添加</i-button>
+
+                            <Dropdown transfer @on-click="addPoups" v-if="shortcutMenuIndex > 0">
+                                <Button type="primary" class="btn btn-add" :disabled="!rowPhone">
+                                    快捷菜单
+                                </Button>
+                                <DropdownMenu slot="list">
+                                    <DropdownItem name="0" :disabled="!rowPhone" v-if="canAddXmqz">开单</DropdownItem>
+                                    <DropdownItem name="1" :disabled="!rowPhone" v-if="canAddZxjl">添加咨询记录</DropdownItem>
+                                    <DropdownItem name="2" :disabled="!rowPhone" v-if="canExecute">查询待护理项目</DropdownItem>
+                                </DropdownMenu>
+                            </Dropdown>
+                            
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="getRowID"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page"  @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+        <!-- 查询电话号码弹窗 -->
+        <Modal :mask-closable="false"  v-model="poupSearchTel" class="dialog" v-if="showAdd">
+            <div slot='header' class="header">
+                请输入电话号码
+            </div>
+            <Form :model="searchTel" ref="searchTelForm" @submit.native.prevent="searchCustomerTel">
+                <Form-item prop="tel" :rules="searchRule.tel">
+                    <i-input v-model="searchTel.tel" placeholder="请输入用户的手机号" autofocus ref="searchTel"></i-input>
+                </Form-item>
+            </Form>
+            <div slot='footer' class="footer">
+                <i-button class="btn-sure" type="primary" @click="searchCustomerTel" :loading="loading">确定</i-button>
+                <i-button class="btn-cancel" type="warning" @click="searchReset" :loading="loading">取消</i-button>
+            </div>
+        </Modal>
+        <!-- 弹窗 -->
+        <Modal :mask-closable="false"  v-model="modal1" class="dialog" v-if="showAdd">
+            <div slot='header' class="header">
+                新增
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="84" @submit.native.prevent class="form" >
+                <FormItem prop="CustomerName" label="客户姓名：" :rules="formValidateRule.CustomerName">
+                    <Input v-model="formValidate.CustomerName" placeholder="姓名" :disabled="customerEnable" />
+                </FormItem>
+                <FormItem label="电话：" prop="CustomerPhone" :rules="formValidateRule.CustomerPhone">
+                    <Input v-model="formValidate.CustomerPhone" placeholder="电话" :disabled="customerEnable"/>
+                </FormItem>
+                <FormItem label="生日：" prop="Birthday" :rules="formValidateRule.Birthday">
+                    <DatePicker  @on-change="dianji1" style="width:100%" type="date" placeholder="客户生日" v-model="formValidate.Birthday" :editable="false" :disabled="birthdayEnable" ></DatePicker>
+                </FormItem>
+                <FormItem label="年龄：" prop="CustomerAge" v-if="customerEnable">
+                    <Input v-model="formValidate.CustomerAge" placeholder="年龄：" :disabled="true" />
+                </FormItem>
+                <FormItem label="年龄：" prop="CustomerAge" :rules="formValidateRule.CustomerAge" v-else>
+                    <Input-number :max="999" :min="1" v-model="formValidate.CustomerAge" style="width:100%"></Input-number>
+                </FormItem>
+                <FormItem label="性别：" prop="Sex"  v-show="customerEnable">
+                    <Input v-model="formValidate.CustomerSex" disabled />
+                </FormItem>
+                <FormItem label="性别：" prop="Sex" :rules="formValidateRule.CustomerSex" v-if="!customerEnable">
+                    <Select v-model="formValidate.Sex">
+                        <Option value="男">男</Option>
+                        <Option value="女">女</Option>
+                    </Select>
+                </FormItem>
+                <FormItem label="门店总监：" prop="SceneEmployeeID"  :rules="formValidateRule.SceneEmployeeID">
+                    <Select v-model="formValidate.SceneEmployeeID" :filterable="true" @on-change="chooseYymd">
+                        <Option :value="item.ID" v-for="(item, index) in mfzjList" :key="item.ID">{{item.Name}}</Option>
+                    </Select>
+                </FormItem>
+
+
+
+                <FormItem label="最近咨询：" prop="LatestConsultCategoryName">
+                    <Input v-model="formValidate.LatestConsultCategoryName" :disabled="true" />
+                </FormItem>
+
+                <FormItem label="咨询项目：" prop="ItemCategoryID" :rules="formValidateRule.ItemCategoryID">
+                    <Select v-model="formValidate.ItemCategoryID" :filterable="true" @on-change="chooseYymd">
+                        <Option :value="item.ID" v-for="(item, index) in zxxmList" :key="item.ID" >{{item.Name}}</Option>
+                    </Select>
+                </FormItem>
+                <FormItem label="了解途径：" prop="UnderstandWayName" v-if="customerEnable && formValidate.UnderstandWayName">
+                    <Input v-model="formValidate.UnderstandWayName" placeholder="" disabled />
+                </FormItem>
+                <FormItem label="了解途径：" prop="UnderstandWayID" :rules="formValidateRule.UnderstandWayID" v-else>
+                    <Select v-model="formValidate.UnderstandWayID" placeholder="请选择">
+                        <Option :value="item.ID" v-for="(item, index) in ljtjList"  :key="index">{{item.Name}}</Option>
+                    </Select>
+                </FormItem>
+                
+                <FormItem label="来源渠道：" prop="ChannelName" :rules="formValidateRule.ChannelName"  v-if="customerEnable && formValidate.ChannelName">
+                    <Input v-model="formValidate.ChannelName" placeholder="" disabled />
+                </FormItem>
+
+                <FormItem label="来源渠道：" prop="ChannelID" :rules="formValidateRule.ChannelID" v-else>
+                    <!-- <Input v-model="formValidate.ChannelID" placeholder="" v-if="customerEnable" disabled></Input> -->
+                    <Select v-model="formValidate.ChannelID" placeholder="请选择" >
+                        <Option :value="item.ID" v-for="(item, index) in lyqdList" :key="index">{{item.Name}}</Option>
+                    </Select>
+                </FormItem>
+                 <!-- <FormItem label="是否执行：" prop="IsReview" :rules="formValidateRule.IsReview">
+                    <Select v-model="formValidate.IsReview" placeholder="请选择">
+                        <Option :value="1">是</Option>
+                        <Option :value="0">否</Option>
+                    </Select>
+                </FormItem> -->
+            </Form>
+            <div slot="footer" class="footer">
+                <i-button type="primary" class="btn" @click="addForm" :loading="loading">保存</i-button>
+                <i-button type="warning" class="btn" @click="resetForm" :loading="loading">取消</i-button>
+            </div>
+        </Modal>
+    </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import storejs from "storejs";
+import { mapState } from "vuex";
+import moment from "moment";
+export default {
+  data() {
+    const validateTel = (rule, value, callback) => {
+      let reg = /^1\d{10}$/;
+      if (value === "") {
+        callback(new Error("手机号不得为空"));
+      } else if (!reg.test(value)) {
+        callback(new Error("请输入正确的手机号"));
+      } else {
+        callback();
+      }
+    };
+    return {
+      data1: "",
+      shortcutMenuIndex: 0,
+      canAddXmqz: false,
+      canAddZxjl: false,
+      canExecute: false,
+      pageLoading: true,
+      showAdd: false,
+      rowPhone: null,
+      loading: false,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 200,
+      tableLoading: true,
+      poupSearchTel: false,
+      searchTel: {
+        tel: ""
+      },
+      searchRule: {
+        tel: {
+          required: true,
+          message: "请输入正确的手机号码",
+          trigger: "blur",
+          type: "number",
+          validator: validateTel
+        }
+      },
+      modal1: false,
+      customerEnable: false,
+      birthdayEnable: false,
+      formValidate: {
+        CustomerID: "",
+        CustomerName: "",
+        CustomerPhone: "",
+        CustomerAge: 0,
+        Sex: "",
+        SceneEmployeeID: "",
+        UnderstandWayID: "",
+        ItemCategoryID: "",
+        ChannelID: "",
+        // IsReview: '',
+        UnderstandWayName: "",
+        ChannelName: "",
+        LatestConsultCategoryName: "",
+        Birthday: ""
+      },
+      formValidateRule: {
+        CustomerSex: {
+          required: true,
+          message: "性别不得为空",
+          trigger: "blur"
+        },
+        CustomerName: {
+          required: true,
+          message: "姓名不得为空",
+          trigger: "blur"
+        },
+        CustomerAge: {
+          required: true,
+          message: "年龄不得为空",
+          trigger: "blur",
+          type: "number"
+        },
+        CustomerPhone: {
+          required: true,
+          message: "电话不得为空",
+          trigger: "blur"
+        },
+        ItemCategoryID: {
+          required: true,
+          message: "咨询项目不得为空",
+          trigger: "blur",
+          type: "string"
+        },
+        SceneEmployeeID: {
+          required: true,
+          message: "美肤总监不得为空",
+          trigger: "blur",
+          type: "string"
+        },
+        UnderstandWayID: {
+          required: true,
+          message: "了解途径不得为空",
+          trigger: "blur",
+          type: "string"
+        },
+        ChannelID: {
+          required: true,
+          message: "来源渠道不得为空",
+          trigger: "blur",
+          type: "string"
+        },
+        Birthday: {
+          required: true,
+          message: "生日不得为空",
+          trigger: "change",
+          type: "date"
+        }
+        // IsReview: {required: true, message: '是否复查不得为空', trigger: 'blur', type: 'number'}
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        userTel: "",
+        userName: ""
+      },
+      columns1: [
+        {
+          title: "登记日期",
+          key: "Date",
+          width: 180,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.Date) {
+              return "";
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.Date).format("YYYY-MM-DD HH:mm:ss")
+            );
+          }
+        },
+        {
+          title: "客户状态",
+          width: 120,
+          key: "CustomerStatusName",
+          align: "center"
+        },
+        {
+          title: "客户姓名",
+          width: 180,
+          key: "CustomerName",
+          align: "center"
+        },
+        {
+          title: "性别",
+          width: 100,
+          key: "CustomerSex",
+          align: "center"
+        },
+        {
+          title: "年龄",
+          width: 100,
+          key: "CustomerAge",
+          align: "center"
+        },
+        {
+          title: "电话",
+          width: 180,
+          key: "PhoneNumber",
+          align: "center",
+          width: 140
+        },
+        {
+          title: "所属门店",
+          width: 180,
+          key: "StoreName",
+          align: "center"
+        },
+        {
+          title: "网络来源",
+          width: 180,
+          key: "NetChannelName",
+          align: "center"
+        },
+        {
+          title: "了解途径",
+          width: 180,
+          key: "UnderstandWayName",
+          align: "center"
+        },
+        {
+          title: "咨询项目",
+          width: 180,
+          key: "ItemCategoryName",
+          align: "center"
+        },
+        {
+          title: "登记人",
+          width: 180,
+          key: "HandleByName",
+          align: "center"
+        },
+        {
+          title: " "
+        }
+      ],
+      list: [],
+      mfzjList: [],
+      zxxmList: [],
+      ljtjList: [],
+      lyqdList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    dianji1(e) {
+      this.data1 = e.substring(0, 4);
+      if (this.data1 == "") {
+        this.formValidate.CustomerAge == "";
+      } else {
+        this.formValidate.CustomerAge = 2018 - this.data1;
+      }
+    },
+
+    setShortcutMenuAuthor() {
+      let that = this;
+      //项目确诊单(快捷菜单权限验证)
+      let list1 = that.authorList["xmqz"];
+      if (list1) {
+        for (let i of list1) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddXmqz = i.IsVisible;
+          }
+        }
+      }
+      //咨询记录(快捷菜单权限验证)
+      let list2 = that.authorList["zxjl"];
+      if (list2) {
+        for (let i of list2) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canAddZxjl = i.IsVisible;
+          }
+        }
+      }
+      //项目执行(快捷菜单权限验证)
+      let list3 = that.authorList["xmzx"];
+      if (list3) {
+        for (let i of list2) {
+          if (i.Name === "增加") {
+            that.shortcutMenuIndex++;
+            that.canExecute = i.IsVisible;
+          }
+        }
+      }
+
+      that.setShortcutMenuIndex = 0;
+    },
+    addPoups(name) {
+      let that = this;
+      let type = Number(name);
+      if (type == 0) {
+        that.$router.push({
+          name: "xmqz",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 1) {
+        that.$router.push({
+          name: "zxjl",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+      if (type == 2) {
+        that.$router.push({
+          name: "xmzx",
+          params: {
+            phone: that.rowPhone
+          }
+        });
+        return false;
+      }
+    },
+    getRowID(row) {
+      let that = this;
+      // that.rowID = row.ID
+      that.rowPhone = row.truePhone;
+    },
+    showAddPoup() {
+      let that = this;
+      that.$refs.searchTelForm.resetFields();
+      that.poupSearchTel = true;
+      that.$nextTick(() => {
+        that.$refs.searchTel.focus();
+      });
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            that.showAdd = i.IsVisible;
+          }
+        }
+      }
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    chooseYymd() {
+      let that = this;
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    addForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          that.loading = true;
+          let a = that.formValidate;
+          let data = {
+            CustomerID: a.CustomerID,
+            CustomerName: a.CustomerName,
+            CustomerPhone: a.CustomerPhone,
+            CustomerAge: a.CustomerAge,
+            Sex: a.Sex,
+            SceneEmployeeID: a.SceneEmployeeID,
+            UnderstandWayID: a.UnderstandWayID,
+            ItemCategoryID: a.ItemCategoryID,
+            ChannelID: a.ChannelID
+            // IsReview: a.IsReview > 0 ? true : false
+          };
+          // data.IsReview = data.IsReview > 0 ? true : false
+          data.HandleBy = that.userMes.EmployeeID;
+          data.Birthday = moment(that.formValidate.Birthday).format(
+            "YYYY-MM-DD"
+          );
+          api.customerComeLogs(data).then(response => {
+            that.loading = false;
+            if (response.error_code === "Success") {
+              that.$Message.success("添加成功");
+              that.$refs.formValidate1.resetFields();
+              that.modal1 = false;
+              that.getList();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          this.$Message.error("有必填项为空");
+        }
+      });
+    },
+    searchCustomerTel() {
+      let that = this;
+      that.$refs.searchTelForm.validate(validate => {
+        if (validate) {
+          // 搜索...
+          let data = {
+            CustomerPhone: that.searchTel.tel,
+            EmployeeID: that.userMes.EmployeeID
+          };
+          that.loading = true;
+          api.getCustomerByPhone(data).then(response => {
+            let a = {
+              Name: "",
+              Age: "",
+              Phone: data.CustomerPhone,
+              CustomerSex: ""
+            };
+            that.loading = false;
+            if (response.error_code === "Success") {
+              console.log(response.data);
+              console.log(response.data.ID);
+              that.formValidate.CustomerID = response.data.ID;
+              a = response.data;
+              console.log(that.formValidate.CustomerID);
+              if (response.data.ID!=null)
+              {
+                that.customerEnable = true;
+                that.birthdayEnable = true;
+                if (!a.Birthday) {
+                  that.birthdayEnable = false;
+                }
+              } else
+              {
+                that.formValidate.CustomerID = "";
+                that.customerEnable = false;
+                that.birthdayEnable = false;
+              }              
+            } else {
+              that.formValidate.CustomerID = "";
+              that.customerEnable = false;
+              that.birthdayEnable = false;
+              that.$Message.error(response.error_message);
+            }
+            that.setData(a);
+            that.poupSearchTel = false;
+            that.$refs.searchTelForm.resetFields();
+            that.modal1 = true;
+          });
+        } else {
+            that.$Message.error({content:"请输入用户的联系电话",duration:3});
+        }
+      });
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.CustomerName = res.Name ? res.Name : "";
+      that.formValidate.CustomerAge = res.Age ? res.Age : "";
+      that.formValidate.CustomerPhone = res.Phone ? res.Phone : "无";
+      that.formValidate.CustomerSex = res.Sex ? res.Sex : "无";
+      that.formValidate.Sex = res.Sex ? res.Sex : "";// 20181108
+      that.formValidate.UnderstandWayName = res.UnderstandWayName;
+      that.formValidate.UnderstandWayID = res.UnderstandWayID;
+      that.formValidate.ChannelID = res.ChannelID;
+      that.formValidate.SceneEmployeeID = res.SceneEmployeeID
+        ? res.SceneEmployeeID
+        : "";
+      that.formValidate.ChannelName = res.ChannelName ? res.ChannelName : "";
+      that.formValidate.LatestConsultCategoryName = res.LatestConsultCategoryName
+        ? res.LatestConsultCategoryName
+        : "";
+      that.formValidate.Birthday = res.Birthday ? res.Birthday : "";
+    },
+    searchReset() {
+      let that = this;
+      that.$refs.searchTelForm.resetFields();
+      that.poupSearchTel = false;
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+      that.tablePage = teblePage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        startDate: that.formItem.startDate,
+        endDate: that.formItem.endDate,
+        CustomerName: that.formItem.userName,
+        CustomerPhone: that.formItem.userTel,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum
+      };
+      if (data.CustomerPhone) {
+        let regex = /^1\d{10}$/;
+        if (!regex.test(data.CustomerPhone)) {
+          that.$Message.error("电话号码格式有误");
+          return false;
+        }
+      }
+      that.tableLoading = true;
+      // 转换日期
+      if (data.startDate) {
+        data.startDate = moment(data.startDate).format("YYYY-MM-DD");
+      }
+      if (data.endDate) {
+        data.endDate = moment(data.endDate).format("YYYY-MM-DD");
+      }
+      api.getCustomerComeLogsByEmployeeID(data).then(response => {
+        if (response.error_code === "Success") {
+          console.log(response.data);
+          let res = response.data;
+          
+          for (let i of res.list) {
+            let phone = i.PhoneNumber;
+            i.truePhone = phone;
+            // console.log(i.truePhone)
+            i.PhoneNumber =
+              phone.substring(0, 3) + "****" + phone.substr(phone.length - 4);
+          }
+          that.list = res.list;
+          that.tableLoading = false;
+          that.$set(that.tablePage, "page", res.page);
+          that.$set(that.tablePage, "pageNum", res.size);
+          that.$set(that.tablePage, "allNum", res.total);
+          that.tablePage.maxPageNum = res.totalPage;
+          that.setPage();
+        } else {
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    getSceneEmployeesByEmployeeID() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getSceneEmployeesByEmployeeID(data).then(response => {
+        if (response.error_code === "Success") {
+          that.mfzjList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getProjectList() {
+      let that = this;
+      api.getValidSubCategories().then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.zxxmList = res.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getLjtjList() {
+      let that = this;
+      api.getUnderstandWaysByValid().then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.ljtjList = res.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getLyqdList() {
+      let that = this;
+      api.getValidChannels().then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.lyqdList = res.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.pageLoading = false;
+      that.setAuthor();
+      that.initTableHeight();
+      that.getList();
+      that.getProjectList();
+      that.getLjtjList();
+      that.getLyqdList();
+      that.getSceneEmployeesByEmployeeID();
+      that.setShortcutMenuAuthor();
+    });
+  },
+  activated() {
+    let that = this;
+    that.$nextTick(() => {
+      let phone = that.$route.params.phone;
+      if (phone) {
+        // 快捷菜单
+        that.searchTel.tel = phone;
+        // that.$store.commit('changeLoadingPage')
+        setTimeout(() => {
+          that.searchCustomerTel();
+        }, 300);
+      }
+    });
+  }
+};
+</script>
+<style>
+</style>

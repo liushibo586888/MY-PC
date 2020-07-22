@@ -1,0 +1,285 @@
+<template>
+  <div class="zfmx-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <!-- <i-col span="3">
+                        <formItem prop="StartDate">
+                            <DatePicker type="date" placeholder="开始日期" class="DatePicker_time" :options="options1" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="EndDate">
+                            <DatePicker type="date" placeholder="结束日期" class="DatePicker_time" :options="options1" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col> -->
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <!-- <i-col span="3">
+                        <FormItem prop="userTel">
+                            <Input v-model="formItem.userTel" placeholder="电话" />
+                        </FormItem>
+                    </i-col> -->
+          <i-col span="21">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+              <!-- <Button type="success" class="btn btn-search" @click="searchForm">添加</Button>
+                            <Button type="error" class="btn btn-reset" @click="resetSearch">修改</Button> -->
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="primary">导出统计详情</i-button>
+      <!-- <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div> -->
+    </div>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import axios from "axios";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    return {
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 40,
+      formItem: {
+        StartDate: new Date(),
+        EndDate: new Date(),
+        StoreID: null,
+        EmployeeID: "",
+        userTel: "",
+        store: "all"
+      },
+      columns1: [
+        {
+          title: "客户总数",
+          key: "Total",
+          align: "center"
+        },
+        {
+          title: "跟踪客数量",
+          key: "Track",
+          align: "center"
+        },
+        {
+          title: "次卡数量",
+          key: "SingleNum",
+          align: "center"
+        },
+        {
+          title: "年卡数量",
+          key: "YearCardNum",
+          align: "center"
+        },
+        {
+          title: "15天未执行",
+          key: "FifteenDay",
+          align: "center"
+        },
+        {
+          title: "30天未执行",
+          key: "ThirtyDay",
+          align: "center"
+        },
+        {
+          title: "45天未执行",
+          key: "FortyfiveDay",
+          align: "center"
+        },
+        {
+          title: "60天未执行",
+          key: "Sixty",
+          align: "center"
+        },
+        {
+          title: "60天以上未执行",
+          key: "SixtyMoreDay",
+          align: "center"
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    exportTable() {
+      let that = this;
+      window.location.href =
+        axios.defaults.baseURL +
+        "/NewReport/Export?StoreId=" +
+        that.formItem.StoreID +
+        "&employeeId=" +
+        that.userMes.EmployeeID;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      //判断两个时间段大小
+   
+      if (
+        echartsCommon.ContrastTime(
+          this.$Message,
+          that.formItem.StartDate,
+          that.formItem.EndDate
+        )
+      ) {
+        that.tablePage.page = 1;
+        that.getList();
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          employeeId: that.userMes.EmployeeID,
+          StoreId: that.formItem.StoreID,
+          Page: that.tablePage.page,
+          Size: that.tablePage.pageNum
+        };
+        that.tableLoading = true;
+        api.QueryCustNum(data).then(response => {
+          if (response.error_code === "Success") {
+            that.list = [];
+            let res = response.data;
+            that.list.push(res);
+            that.tableLoading = false;
+            that.page = res.page;
+            that.tablePage.allNum = res.total;
+            that.tablePage.maxPageNum = res.totalPage;
+            that.setPage();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let data = {
+        employeeID: that.userMes.EmployeeID
+      };
+      api.baogetEmployeeByAllStoreInfo(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          let a = { ID: "0", Name: "全部" };
+          that.storeList.unshift(a);
+          that.formItem.store = that.storeList[0].Name;
+          that.formItem.StoreID = that.storeList[0].ID;
+          that.getList();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    choose(name, id) {
+      this.formItem.store = name;
+      this.formItem.StoreID = id;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getStore();
+    });
+  }
+};
+</script>
+<style>
+</style>
+

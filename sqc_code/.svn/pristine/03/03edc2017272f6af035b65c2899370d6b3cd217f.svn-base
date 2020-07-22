@@ -1,0 +1,16 @@
+export default {
+  data() {
+    return {
+      options1: {
+        shortcuts: [
+          {
+            text: "今天",
+            value() {
+              return new Date();
+            }
+          }
+        ]
+      }
+    };
+  }
+};

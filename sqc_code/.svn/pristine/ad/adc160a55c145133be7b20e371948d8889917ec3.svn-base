@@ -1,0 +1,258 @@
+<template>
+  <div class="jyshD-container container">
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          护理师业绩客户占比
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+export default {
+  props: ["startDate", "endDate", "storeID"],
+  data() {
+    return {
+      spinShow: true
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    sum(index, xinData, zhuiData, oldData, jiaData) {
+      return xinData[index] + zhuiData[index] + oldData[index] + jiaData[index];
+    },
+    setEcharts(xinData, zhuiData, oldData, jiaData, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              // 坐标轴指示器，坐标轴触发有效
+              type: "shadow" // 默认为直线，可选为：'line' | 'shadow'
+            }
+          },
+          legend: {
+            data: ["新客", "跟踪客", "护理客", "家居产品"]
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            containLabel: true
+          },
+          yAxis: {
+            type: "value"
+          },
+          xAxis: {
+            type: "category",
+            data: barName
+          },
+          series: [
+            {
+              name: "新客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              markPoint: {
+                data: [
+                  {
+                    symbolSize: [80, 80],
+                    value: that.sum(0, xinData, zhuiData, oldData, jiaData),
+                    xAxis: 0,
+                    yAxis: that.sum(0, xinData, zhuiData, oldData, jiaData)
+                  }
+                ]
+              },
+              data: xinData
+            },
+            {
+              name: "跟踪客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              markPoint: {
+                data: [
+                  {
+                    symbolSize: [80, 80],
+                    value: that.sum(1, xinData, zhuiData, oldData, jiaData),
+                    xAxis: 1,
+                    yAxis: that.sum(1, xinData, zhuiData, oldData, jiaData)
+                  }
+                ]
+              },
+              data: zhuiData
+            },
+            {
+              name: "护理客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              markPoint: {
+                data: [
+                  {
+                    symbolSize: [80, 80],
+                    value: that.sum(2, xinData, zhuiData, oldData, jiaData),
+                    xAxis: 2,
+                    yAxis: that.sum(2, xinData, zhuiData, oldData, jiaData)
+                  }
+                ]
+              },
+              data: oldData
+            },
+            {
+              name: "家居产品",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              markPoint: {
+                data: [
+                  {
+                    symbolSize: [80, 80],
+                    value: that.sum(3, xinData, zhuiData, oldData, jiaData),
+                    xAxis: 3,
+                    yAxis: that.sum(3, xinData, zhuiData, oldData, jiaData)
+                  }
+                ]
+              },
+              data: jiaData
+            }
+          ]
+        };
+
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StartDate: that.startDate,
+          EndDate: that.endDate,
+          StoreID: that.storeID,
+          customerStatus: "",
+          EmployeeID: that.userMes.EmployeeID
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+        }
+        that.tableLoading = true;
+        that.spinShow = true;
+        api
+          .getAllEmployeeCustomerTypePerformanceFromStore(data)
+          .then(response => {
+            that.tableLoading = false;
+            if (response.error_code === "Success") {
+              that.list = response.data;
+              that.setPieData();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+      }, 100);
+    },
+    setPieData() {
+      let that = this;
+      let xinData = [];
+      let zhuiData = [];
+      let oldData = [];
+      let jiaData = [];
+      let barName = [];
+      for (let i in that.list) {
+        xinData.push(that.list[i].NewCustomerFirstVisit);
+        zhuiData.push(that.list[i].NewCustomerFurtherConsulting);
+        oldData.push(that.list[i].OldCustomer);
+        jiaData.push(that.list[i].Value4);
+        barName.push(that.list[i].Name);
+      }
+      that.setEcharts(xinData, zhuiData, oldData, jiaData, barName);
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+  },
+  watch: {
+    startDate(val, oldVal) {
+      this.getList();
+    },
+    endDate(val1, oldVal1) {
+      this.getList();
+    },
+    storeID(val2, oldVal2) {
+      this.getList();
+    }
+  }
+};
+</script>
+<style>
+</style>

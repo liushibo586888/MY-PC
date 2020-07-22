@@ -1,0 +1,81 @@
+<template>
+    <div class="ygbb-container container">
+        <div>
+            <Tabs value="name1" @on-click="tabChange">
+                <TabPane label="顾客分类业绩占比" icon="dot" name="name1">
+                    <keep-alive>
+                        <template v-if="tabIndex=='name1'">
+                            <yjje-demo></yjje-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="项目分类业绩占比" icon="dot" name="name2">
+                    <keep-alive>
+                        <template v-if="tabIndex=='name2'">
+                            <ygbb1-demo></ygbb1-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+
+                <TabPane label="标签三" icon="dot" name="name3">
+                    <keep-alive>
+                        <template v-if="tabIndex=='name3'">
+                            <ygbb2-demo></ygbb2-demo>
+                        </template>
+                    </keep-alive>
+                </TabPane>
+            </Tabs>
+        </div>
+    </div>
+</template>
+<script>
+import ygbb1Demo from "../ygbb/ygbb1";
+import ygbb2Demo from "../ygbb/ygbb2";
+import yjjeDemo from "../ygbb/yjje";
+export default {
+  data() {
+    return {
+      tabIndex: "name1"
+    };
+  },
+  methods: {
+    tabChange(name) {
+      let that = this;
+      that.tabIndex = name;
+    }
+  },
+  components: {
+    ygbb1Demo,
+    ygbb2Demo,
+    yjjeDemo
+  }
+};
+</script>
+<style>
+.ygbb-container .ivu-tabs-nav .ivu-tabs-tab .ivu-icon.ivu-icon-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e9eaec;
+}
+.ygbb-container .ivu-tabs-tab-active .ivu-icon.ivu-icon-dot {
+  background: #79aa49 !important;
+}
+.ivu-tabs {
+  margin-top: -72px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  color: #495060;
+  zoom: 1;
+}
+.ivu-tabs .ivu-tabs-tabpane {
+  margin-top: -27px;
+  -ms-flex-negative: 0;
+  flex-shrink: 0;
+  width: 100%;
+  transition: opacity 0.3s;
+  opacity: 1;
+}
+</style>

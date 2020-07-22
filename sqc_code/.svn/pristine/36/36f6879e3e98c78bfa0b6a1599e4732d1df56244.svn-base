@@ -1,0 +1,856 @@
+<template>
+  <div class="customerDetail-container container">
+    <div class="header">
+      <p class="title">客户资料</p>
+      <p class="content">门店地址:{{user.StoreName}}</p>
+    </div>
+    <!-- 客户基本信息 -->
+    <template v-if="user.Name">
+      <div class="detail-wrapper">
+        <div class="avatar" :style="{'background': 'url(data:image/jpeg;base64,'+ user.HeadImage +') no-repeat center center / cover'}">
+          <div class="avatar-change"  v-if="allowModificationUserAvatar">
+            <input type="file" style="position:absolute;width:100%;height:100%;top:0;left:0; opacity:0; z-index:1;"  accept="image/gif,image/jpeg,image/jpg,image/png,image/svg" @change="uploadImg">
+            <div>修改<br>头像</div>
+          </div>
+        </div>
+        <div class="content">
+          <Row type="flex" justify="space-around" class-name="row-height" align="middle">
+            <i-col span="6">
+              <span>姓名：</span>
+              <span>{{user.Name}}</span>
+            </i-col>
+            <i-col span="6" class-name="flex-col">
+              <template v-if="user.PhoneList && user.PhoneList.length>0">
+                <span>联系电话：</span>
+                <span style="margin-right:10px;">{{user.PhoneList[0].Phone}}</span>
+                <div class="arrow-box" @click="modal2 = true">
+                  <Icon type="chevron-down"></Icon>
+                </div>
+                <!-- <Poptip placement="bottom-end" v-if="user.PhoneList.length>1 >= 1">
+                  <div class="arrow-box">
+                    <Icon type="chevron-down"></Icon>
+                  </div>
+                  <div slot="title">客户电话</div>
+                  <div slot="content">
+                    <p v-for="(phone, index) in user.PhoneList" :key="index" v-if="index >= 1">{{phone}}</p>
+                  </div>
+                </Poptip> -->
+            </template>
+            </i-col>
+            <i-col span="7" class-name="flex-col">
+            </i-col>
+          </Row>
+          <Row type="flex" justify="space-around" class-name="row-height" align="middle">
+            <i-col span="6">
+              <span>年龄：</span>
+              <span>{{user.Age}}</span>
+            </i-col>
+            <i-col span="6">
+              <span>生日：</span>
+              <span>{{user.BirthDay | formatDate}}</span>
+            </i-col>
+            <i-col span="7">
+              <span>电子邮箱：</span>
+              <span>{{user.Email}}</span>
+            </i-col>
+          </Row>
+          <Row type="flex" justify="space-around" class-name="row-height" align="middle">
+            <i-col span="6">
+              <span>性别：</span>
+              <span>{{user.Sex}}</span>
+            </i-col>
+            <i-col span="6">
+              <span>QQ：</span>
+              <span>{{user.QQ}}</span>
+            </i-col>
+            <i-col span="7">
+              <span>身份证：</span>
+              <span>{{user.CIdentity}}</span>
+            </i-col>
+          </Row>
+        </div>
+        <div class="btn-box" style="align-self: center; box-sizing:border-box;" v-if="allowModificationBaseInfo">
+        <!-- <div class="btn-box" style="align-self: flex-end; padding-bottom: 20px; box-sizing:border-box;"> -->
+          <i-button type="ghost" size="large" class="btn-revise" @click="getDetail">修改</i-button>
+        </div>
+      </div>
+      <div class="detail-content">
+        <Row type="flex" justify="space-around" class-name="row-height" align="middle">
+          <i-col span="5" class-name="col-height">
+            <span class="title">了解途径：</span>
+            <span class="text">{{user.UnderstandWayName}}</span>
+          </i-col>
+          <i-col span="5" class-name="col-height">
+            <span class="title">网络来源：</span>
+            <span class="text">{{user.NetChannelInfoName}}</span>
+          </i-col>
+          <i-col span="5" class-name="col-height">
+            <span class="title">门店总监：</span>
+            <span class="text">{{user.SceneEmployeeName}}</span>
+          </i-col>
+          <i-col span="5" class-name="col-height">
+            <span class="title">来源渠道：</span>
+            <span class="text">{{user.ChannelInfoName}}</span>
+          </i-col>
+          <i-col span="4" class-name="col-height">
+            <span class="title">质量度：</span>
+            <span class="text">{{user.StarRating}}</span>
+          </i-col>
+        </Row>
+        <Row type="flex" justify="space-around" class-name="row-height" align="middle">
+          <i-col span="5" class-name="col-height">
+            <span class="title">是否黑名单：</span>
+            <span class="text">{{user.IsBlack ? '是' : '否'}}</span>
+          </i-col>
+          <i-col span="5" class-name="col-height">
+            <span class="title">会员级别：</span>
+            <span class="text">{{user.MemberLevel}}</span>
+          </i-col>
+          <i-col span="5" class-name="col-height">
+            <span class="title">网络咨询：</span>
+            <span class="text">{{user.TMKEMployeeName}}</span>
+          </i-col>
+          <i-col span="5" class-name="col-height">
+            <span class="title">客户状态：</span>
+            <span class="text">{{user.CustomerStatusText}}</span>
+          </i-col>
+          <i-col span="4" class-name="col-height"></i-col>
+        </Row>
+      </div>
+    </template>
+    <template v-else>
+      <div class="detail-wrapper"></div>
+      <div class="detail-content"></div>
+    </template>
+    <!-- 主要内容 -->
+    <div class="main-content">
+      <!-- 选项卡1 -->
+      <Tabs :animated="false" type="card" @on-click="tabChange">
+        <TabPane label="来院情况" icon="dot">
+            <template v-if="tabIndex == 0">
+              <situationOfHospital :CustomerID="ID"></situationOfHospital>
+            </template>
+        </TabPane>
+        <TabPane label="客户账户信息" icon="dot">
+            <template v-if="tabIndex == 1">
+              <accountOverview :CustomerID="ID"></accountOverview>
+            </template>
+        </TabPane>
+        <TabPane label="消费意向" icon="dot">
+          <template v-if="tabIndex == 2">
+            <consumptionIntention :CustomerID="ID"></consumptionIntention>
+          </template>
+        </TabPane>
+        <TabPane label="客户标签" icon="dot">
+          <template v-if="tabIndex == 3">
+            <customerDetailTag :CustomerID="ID"></customerDetailTag>
+          </template>
+        </TabPane>
+        <TabPane label="照片" icon="dot">
+          <template  v-if="tabIndex == 4">
+            <customerPhoto :CustomerID="ID"></customerPhoto>
+          </template>
+        </TabPane>
+      </Tabs>
+    </div>
+    <!-- 修改 -->
+    <Modal :mask-closable="false" v-model="modal1" class="dialog" width="800">
+      <div slot='header' class="header">
+        修改
+      </div>
+      <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+        <row type="flex" justify="space-between">
+            <i-col span="11">
+              <FormItem prop="Name" label="客户姓名：" :rules="formValidateRule.Name">
+                <Input v-model="formValidate.Name" placeholder="请输入"></Input>
+              </FormItem>
+            </i-col>
+            <i-col span="11">
+              <FormItem label="年龄：" prop="Age">
+                <Input v-model="formValidate.Age" placeholder="请输入"></Input>
+              </FormItem>
+            </i-col>
+        </row>
+        <row type="flex" justify="space-between">
+          <i-col span="11">
+              <FormItem label="性别：" prop="Sex">
+                <Select v-model="formValidate.Sex">
+                  <Option value="男">男</Option>
+                  <Option value="女">女</Option>
+                </Select>
+              </FormItem>
+          </i-col>
+          <i-col span="11">
+            <FormItem label="生日：" prop="BirthDay">
+              <DatePicker type="date" placeholder="请选择" v-model="formValidate.BirthDay" style="width:100%;"></DatePicker>
+            </FormItem>
+          </i-col>
+        </row>
+        <row type="flex" justify="space-between">
+          <i-col span="11">
+            <FormItem label="邮箱：" prop="Email">
+              <Input v-model="formValidate.Email" placeholder="请输入"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="11">
+            <FormItem label="身份证：" prop="IDCardNumber">
+                <Input v-model="formValidate.IDCardNumber" placeholder="请输入"></Input>
+            </FormItem>
+          </i-col>
+        </row>
+        <row type="flex" justify="space-between">
+          <i-col span="11">
+            <FormItem label="QQ：" prop="QQ">
+              <Input v-model="formValidate.QQ" placeholder="请输入"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="11">
+            <!-- <FormItem label="修改人员" prop="EmployeeID" :rules="formValidateRule.HandleBy">
+              <Select v-model="formValidate.EmployeeID">
+                <Option :value="item.ID" v-for="(item, index) in HandleList" :key="index">{{item.Name}}</Option>
+              </Select>
+            </FormItem> -->
+          </i-col>
+        </row>
+      </Form>
+      <div slot='footer' class="footer">
+        <i-button type="primary" class="btn" @click="addForm" :loading="loading">确定</i-button>
+        <i-button type="warning" class="btn" @click="resetForm" :loading="loading">取消</i-button>
+      </div>
+    </Modal>
+    <!-- ** -->
+    <!-- 修改客户电话 -->
+    <Modal :mask-closable="false" v-model="modal2" class="dialog changeUserPhone" width="600">
+      <div slot='header' class="header">
+        客户电话
+      </div>
+      <Form ref="formValidate2"  :label-width="80" @submit.native.prevent class="form">
+        <row v-for="(item, index) in user.PhoneList" :key="index" type="flex" align="middle" style="margin-bottom: 24px;">
+          <i-col span="14">
+            <FormItem :label="'电话' + (index + 1) + '：'">
+              <Input v-model="item.Phone" placeholder="请输入" :readonly="item.mode"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="8"  offset="2">
+            <template v-if="item.mode">
+              <Button type="ghost" @click="changeUserMode(item)" size="small" style="border-radius: 4px; margin-right: 10px;" v-if="canEditCustomerPhone">修改</Button>
+              <Button type="ghost" @click="delUserPhone(item, index)" size="small" style="border-radius: 4px;" :loading="onloading" v-if="canDelCustomerPhone">删除</Button>
+            </template>
+            <template v-else>
+              <Button type="ghost" @click="modefyUserPhone(item)" size="small" style="border-radius: 4px;" :loading="onloading">完成</Button>
+              <Button type="ghost" @click="delUserPhone(item, index)" size="small" style="border-radius: 4px;" :loading="onloading" v-if="!item.ID">删除</Button>
+            </template>
+          </i-col>
+        </row>
+        <row type="flex" align="middle" style="margin-bottom: 24px;">
+          <i-col span="14">
+            <Button type="dashed" size="small" style="border-radius: 4px; margin-left: 80px;display: flex; align-items: center;justify-content: center;" icon="plus-round" @click="addUserPhone" v-if="canAddCustomerPhone">新增</Button>
+          </i-col>
+        </row>
+      </Form>
+      <div slot='footer' class="footer">
+        <!-- <i-button type="primary" class="btn" :loading="loading">确定</i-button> -->
+        <i-button type="warning" class="btn" @click="modal2 = false">关闭</i-button>
+      </div>
+    </Modal>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import Exif from "exif-js";
+import moment from "moment";
+// 来院情况
+import situationOfHospital from "@/views/khgl/situationOfHospital.vue";
+// 客户账户信息
+import accountOverview from "@/views/khgl/accountOverview.vue";
+// 消费意向
+import consumptionIntention from "@/views/khgl/consumptionIntention.vue";
+// 介绍客户列表
+// import introduceList from '@/views/khgl/introduceList.vue'
+// 客户标签
+import customerDetailTag from "@/views/khgl/customerDetailTag.vue";
+// 客户照片
+import customerPhoto from "@/views/khgl/customerPhoto.vue";
+import { mapState } from "vuex";
+export default {
+  data() {
+    return {
+      aaa: 1,
+      onloading: false,
+      canDelCustomerPhone: false,
+      canEditCustomerPhone: false,
+      canAddCustomerPhone: false,
+      allowModificationBaseInfo: false,
+      allowModificationUserAvatar: false,
+      loading: false,
+      tabIndex: -1,
+      customerID: "",
+      user: {},
+      HandleList: [],
+      modal1: false,
+      modal2: false,
+      formValidate: {
+        Name: "",
+        Age: "",
+        Sex: "",
+        BirthDay: "",
+        Email: "",
+        IDCardNumber: "",
+        QQ: "",
+        EmployeeID: ""
+      },
+      formValidateRule: {
+        HandleBy: { required: true, message: "请选择开单人", trigger: "blur" },
+        Name: { required: true, message: "请输入客户姓名", trigger: "blur" }
+      }
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    })
+  },
+  methods: {
+    shuaxin() {
+      // this.$router.go(0);
+    },
+    setAllAuthor() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      console.log("list", list);
+      if (list) {
+        for (let i of list) {
+          // 修改客户信息权限
+          if (i.Api === "api/customerDetails/editCustomerBaseInfo") {
+            that.allowModificationBaseInfo = i.IsVisible;
+          }
+          // 修改客户头像权限
+          if (i.Api === "api/customersDetails/editCustomerHeadImage") {
+            that.allowModificationUserAvatar = i.IsVisible;
+          }
+          // 删除客户电话权限
+          if (i.Api === "api/customersDetails/deleteCustomerPhone") {
+            that.canDelCustomerPhone = i.IsVisible;
+          }
+          // 编辑客户电话权限
+          if (i.Api === "api/customersDetails/editCustomerPhone") {
+            that.canEditCustomerPhone = i.IsVisible;
+          }
+          // 添加客户电话权限
+          if (i.Api === "api/customersDetails/addCustomerPhone") {
+            that.canAddCustomerPhone = i.IsVisible;
+          }
+        }
+      }
+    },
+    tabChange(name) {
+      let that = this;
+      that.tabIndex = name;
+    },
+    getBasicInfo() {
+      // 获取客户基本信息
+      let that = this;
+      that.$store.commit("changeLoadingPage");
+      let data = {
+        customerID: that.ID
+      };
+      api.getCustomerDetail(data).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          that.setData(response.data);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setData(res) {
+      let that = this;
+      that.user = res;
+      let PhoneList = res.PhoneList;
+      that.user.PhoneList = [];
+      for (let i of PhoneList) {
+        let a = {
+          ID: i.ID,
+          mode: true,
+          Phone: i.Phone
+        };
+        that.user.PhoneList.push(a);
+      }
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    getDetail() {
+      let that = this;
+      that.formValidate.Name = that.user.Name;
+      that.formValidate.Age = that.user.Age;
+      that.formValidate.Sex = that.user.Sex;
+      that.formValidate.BirthDay = that.user.BirthDay;
+      that.formValidate.Email = that.user.Email;
+      that.formValidate.IDCardNumber = that.user.CIdentity;
+      that.formValidate.QQ = that.user.QQ;
+      that.modal1 = true;
+    },
+    addForm() {
+      // 修改客户信息
+      let that = this;
+      let data = {
+        CustomerID: that.ID,
+        Name: that.formValidate.Name,
+        Age: that.formValidate.Age,
+        Sex: that.formValidate.Sex,
+        BirthDay: that.formValidate.BirthDay,
+        Email: that.formValidate.Email,
+        IDCardNumber: that.formValidate.IDCardNumber,
+        QQ: that.formValidate.QQ,
+        EmployeeID: that.userMes.EmployeeID
+      };
+      that.loading = true;
+      api.editCustomerBaseInfo(data).then(response => {
+        that.loading = false;
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          that.getBasicInfo();
+          that.resetForm();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    uploadImg(e) {
+      let that = this;
+      let files = e.target.files || e.dataTransfer.files;
+      if (!files.length) return;
+      this.imgPreview(files[0]);
+    },
+    imgPreview(file) {
+      let that = this;
+      let Orientation;
+      // 去获取拍照时的信息，解决拍出来的照片旋转问题
+      Exif.getData(file, function() {
+        Orientation = Exif.getTag(this, "Orientation");
+      });
+      // 看支持不支持FileReader
+      if (!file || !window.FileReader) return;
+      if (/^image/.test(file.type)) {
+        // 创建一个reader
+        let reader = new FileReader();
+        // 将图片2将转成 base64 格式
+        reader.readAsDataURL(file);
+        // 读取成功后的回调
+        reader.onloadend = function() {
+          let result = this.result;
+          let img = new Image();
+          img.src = result;
+          // 判断图片是否大于100K,是就直接上传，反之压缩图片
+          if (this.result.length <= 100 * 1024) {
+            // that.formValidate.Image = result
+            that.changeAvatar(result);
+          } else {
+            img.onload = function() {
+              let data = that.compress(img, Orientation);
+              // that.formValidate.Image = data
+              that.changeAvatar(data);
+            };
+          }
+        };
+      }
+    },
+    rotateImg(img, direction, canvas) {
+      // 最小与最大旋转方向，图片旋转4次后回到原方向
+      const minStep = 0;
+      const maxStep = 3;
+      if (img == null) return;
+      // img的高度和宽度不能在img元素隐藏后获取，否则会出错
+      let height = img.height;
+      let width = img.width;
+      let step = 2;
+      if (step == null) {
+        step = minStep;
+      }
+      if (direction === "right") {
+        step++;
+        // 旋转到原位置，即超过最大值
+        step > maxStep && (step = minStep);
+      } else {
+        step--;
+        step < minStep && (step = maxStep);
+      }
+      // 旋转角度以弧度值为参数
+      let degree = step * 90 * Math.PI / 180;
+      let ctx = canvas.getContext("2d");
+      switch (step) {
+        case 0:
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0);
+          break;
+        case 1:
+          canvas.width = height;
+          canvas.height = width;
+          ctx.rotate(degree);
+          ctx.drawImage(img, 0, -height);
+          break;
+        case 2:
+          canvas.width = width;
+          canvas.height = height;
+          ctx.rotate(degree);
+          ctx.drawImage(img, -width, -height);
+          break;
+        case 3:
+          canvas.width = height;
+          canvas.height = width;
+          ctx.rotate(degree);
+          ctx.drawImage(img, -width, 0);
+          break;
+      }
+    },
+    compress(img, Orientation) {
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      // 瓦片canvas
+      let tCanvas = document.createElement("canvas");
+      let tctx = tCanvas.getContext("2d");
+      let initSize = img.src.length;
+      let width = img.width;
+      let height = img.height;
+      // 如果图片大于四百万像素，计算压缩比并将大小压至400万以下
+      let ratio;
+      if ((ratio = width * height / 4000000) > 1) {
+        ratio = Math.sqrt(ratio);
+        width /= ratio;
+        height /= ratio;
+      } else {
+        ratio = 1;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      // 铺底色
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // 如果图片像素大于100万则使用瓦片绘制
+      let count;
+      if ((count = width * height / 1000000) > 1) {
+        count = ~~(Math.sqrt(count) + 1); // 计算要分成多少块瓦片
+        // 计算每块瓦片的宽和高
+        let nw = ~~(width / count);
+        let nh = ~~(height / count);
+        tCanvas.width = nw;
+        tCanvas.height = nh;
+        for (let i = 0; i < count; i++) {
+          for (let j = 0; j < count; j++) {
+            tctx.drawImage(
+              img,
+              i * nw * ratio,
+              j * nh * ratio,
+              nw * ratio,
+              nh * ratio,
+              0,
+              0,
+              nw,
+              nh
+            );
+            ctx.drawImage(tCanvas, i * nw, j * nh, nw, nh);
+          }
+        }
+      } else {
+        ctx.drawImage(img, 0, 0, width, height);
+      }
+      // 修复ios上传图片的时候 被旋转的问题
+      if (Orientation !== "" && Orientation !== 1) {
+        switch (Orientation) {
+          case 6: // 需要顺时针（向左）90度旋转
+            this.rotateImg(img, "left", canvas);
+            break;
+          case 8: // 需要逆时针（向右）90度旋转
+            this.rotateImg(img, "right", canvas);
+            break;
+          case 3: // 需要180度旋转
+            this.rotateImg(img, "right", canvas); // 转两次
+            this.rotateImg(img, "right", canvas);
+            break;
+        }
+      }
+      // 进行最小压缩
+      let ndata = canvas.toDataURL("image/jpeg", 0.5);
+      tCanvas.width = tCanvas.height = canvas.width = canvas.height = 0;
+      return ndata;
+    },
+    changeAvatar(img) {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        CustomerID: that.ID,
+        HeadImage: img
+      };
+      api.editCustomerAvatar(data).then(response => {
+        if (response.error_code === "Success") {
+          that.$Message.success("提交成功");
+          that.getBasicInfo();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    addUserPhone() {
+      // 新增客户电话
+      let that = this;
+      let a = {
+        ID: null,
+        phone: "",
+        mode: false
+      };
+      that.user.PhoneList.push(a);
+    },
+    delUserPhone(item, index) {
+      let that = this;
+      if (!item.ID) {
+        that.user.PhoneList.splice(index, 1);
+        return false;
+      }
+      that.onloading = true;
+      let data = {
+        ID: item.ID,
+        HandleBy: that.userMes.EmployeeID
+      };
+      api.deleteCustomerPhone(data).then(response => {
+        that.onloading = false;
+        if (response.error_code === "Success") {
+          that.$Message.success("删除成功");
+          that.user.PhoneList.splice(index, 1);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    changeUserMode(item) {
+      // true查看 false 编辑
+      let that = this;
+      item.mode = !item.mode;
+    },
+    modefyUserPhone(item) {
+      // 有ID调修改 无ID调用新增
+      let that = this;
+      that.onloading = true;
+      if (!item.ID) {
+        let data = {
+          customerID: that.ID,
+          HandleBy: that.userMes.EmployeeID,
+          phone: item.Phone
+        };
+        api.addCustomerPhone(data).then(response => {
+          that.onloading = false;
+          if (response.error_code === "Success") {
+            that.$Message.success("添加成功");
+            item.ID = response.data;
+            item.mode = true;
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+        return false;
+      }
+      let data = {
+        ID: item.ID,
+        Phone: item.Phone,
+        HandleBy: that.userMes.EmployeeID
+      };
+      api.editCustomerPhone(data).then(response => {
+        that.onloading = false;
+        if (response.error_code === "Success") {
+          that.$Message.success("修改成功");
+          item.mode = true;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    }
+  },
+  activated() {
+    let that = this;
+    that.ID = that.$route.query.ID;
+    if (that.ID) {
+      that.tabIndex = 0;
+      that.getBasicInfo();
+    }
+  },
+  filters: {
+    formatDate(val) {
+      let that = this;
+      if (!val) {
+        return "";
+      }
+      return moment(val).format("YYYY-MM-DD");
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.setAllAuthor();
+      that.shuaxin();
+    });
+  },
+  components: {
+    situationOfHospital,
+    accountOverview,
+    consumptionIntention,
+    customerDetailTag,
+    customerPhoto
+    // introduceList
+  }
+};
+</script>
+<style>
+.customerDetail-container {
+  padding: 0;
+  background: #fafafa;
+  overflow-y: scroll;
+}
+.customerDetail-container .header {
+  position: relative;
+  width: 100%;
+  left: 0;
+  top: 0;
+  height: 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 22px;
+  background: #fff;
+}
+.customerDetail-container .header:before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 15px;
+  background: #79aa49;
+  left: 10px;
+  top: 10.5px;
+}
+.customerDetail-container .header:after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0px;
+  width: 100%;
+  height: 2px;
+  background: #79aa49;
+}
+.customerDetail-container .header > p {
+  font-size: 16px;
+  color: #666;
+}
+.customerDetail-container .header > .content {
+  color: #79aa49;
+}
+.customerDetail-container .detail-wrapper {
+  height: 134px;
+  background: #fafafa;
+  border-radius: 0px 0px 10px 10px;
+  box-shadow: 0px 15px 0px #f7f7f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 30px;
+}
+.customerDetail-container .detail-wrapper .content {
+  margin-right: 56px;
+  flex: 1;
+  /*height: 100%;*/
+  height: 96px;
+  font-size: 16px;
+  color: #666;
+}
+.customerDetail-container .detail-wrapper .row-height {
+  height: 32px;
+}
+.customerDetail-container .detail-wrapper .avatar {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  border: 4px solid #b9d2a1;
+  border-radius: 50%;
+  overflow: hidden;
+  /*margin-right: 60px;*/
+}
+.customerDetail-container .detail-content {
+  height: 100px;
+  /*background: red;*/
+  background: #fff;
+  position: relative;
+  margin-top: 15px;
+  padding: 0 30px;
+  border-radius: 0px 0px 10px 10px;
+  margin-bottom: 16px;
+}
+.customerDetail-container .detail-content .row-height {
+  height: 44px;
+}
+.customerDetail-container .detail-content span {
+  color: #666;
+  font-size: 16px;
+}
+.customerDetail-container .flex-col {
+  display: flex;
+  align-items: center;
+}
+.customerDetail-container .arrow-box {
+  border: 1px solid #79aa49;
+  width: 24px;
+  text-align: center;
+  height: 15px;
+  line-height: 15px;
+  box-sizing: border-box;
+}
+.customerDetail-container .arrow-box i {
+  font-size: 14px;
+  color: #79aa49;
+  vertical-align: top;
+}
+.customerDetail-container .btn-revise {
+  width: 88px;
+  height: 37px;
+  color: #79aa49;
+  border: 1px solid #79aa49;
+}
+.customerDetail-container .main-content {
+  padding: 0 2px;
+}
+.customerDetail-container .ivu-tabs-nav .ivu-tabs-tab .ivu-icon.ivu-icon-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e9eaec;
+}
+.customerDetail-container .ivu-tabs-tab-active .ivu-icon.ivu-icon-dot {
+  background: #79aa49 !important;
+}
+.customerDetail-container .avatar:hover {
+  cursor: pointer;
+}
+.customerDetail-container .avatar:hover .avatar-change {
+  display: flex;
+}
+.customerDetail-container .avatar-change {
+  display: none;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+}
+.customerDetail-container .btn-revise:hover {
+  border: 1px solid #93d256;
+  color: #93d256;
+}
+.dialog.changeUserPhone .ivu-form-item {
+  margin-bottom: 0;
+}
+</style>

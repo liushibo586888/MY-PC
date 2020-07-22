@@ -1,0 +1,629 @@
+<template>
+  <div class="sf-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="userName">
+              <Input v-model="formItem.userName" placeholder="姓名"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="userTel">
+              <Input v-model="formItem.userTel" placeholder="电话"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="12">
+            <formItem class="btn-box">
+              <i-button type="primary" class="btn" @click="searchForm" :loading="uploading">搜索</i-button>
+              <i-button type="warning" class="btn" @click="resetSearch" :loading="uploading">重置</i-button>
+              <Button type="warning" class="btn btn-add" @click="tianjia">添加</Button>
+              <Button type="warning" class="btn btn-purple" :disabled="!rowID">浏览</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="getRowID"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <div class="bottom-box">
+      <!-- <i-button class="btn-export" @click="exportTable" type="default">导出</i-button> -->
+      <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+        <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+      </Select>
+      <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+      <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+      <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+      <div class="page-box">
+        <p>前往</p>
+        <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+        <p>页</p>
+      </div>
+    </div>
+    <!-- 弹窗 -->
+    <Modal :mask-closable="false" v-model="modal1" class="dialog" width="1200" v-if="showAdd || showEdit">
+      <div slot='header' class="header not-print">
+        收费
+      </div>
+      <div slot='close' class="close not-print">
+        <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+      </div>
+      <!-- 用户信息部分 不可修改 -->
+      <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+        <row type="flex" justify="space-between">
+          <i-col span="12">
+            <FormItem prop="CustomerName" label="套盒名称：">
+              <Input v-model="formValidate.CustomerName" placeholder="无" :disabled="true"></Input>
+            </FormItem>
+          </i-col>
+        </row>
+      </Form>
+      <!-- 添加用 -->
+      <div class="table-box">
+        <i-table stripe :columns="chargeTableHead" :data="chargeTableData"></i-table>
+      </div>
+
+      <Input v-model="formValidate.Remark" placeholder="备注" type="textarea" :rows="4" style="margin-top:20px;" v-if="mode == 1"></Input>
+      <Input v-model="formValidate.Remark" placeholder="备注" type="textarea" :rows="4" style="margin-top:20px;" v-else readonly></Input>
+
+      <div slot="footer" class="footer not-print">
+        <Button class="btn-sure" type="primary" @click="addForm" :loading="uploading" :disabled="stopBC">保存</Button>
+        <Button class="btn-cancel" type="warning" @click="resetForm" :loading="uploading">取消</Button>
+      </div>
+    </Modal>
+  </div>
+</template>
+<script>
+const Decimal = require("decimal");
+import api from "@/api/index.js";
+import Vue from "vue";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+import btnQX from "@/api/btnQX.js";
+export default {
+  data() {
+    return {
+      SHshow: false,
+      columnColor: "",
+      //时间回到今天
+      options1: echartsCommon.shortcuts(),
+      // -----
+      istrue: "",
+      Num: 1,
+      stopBC: false,
+      showAdd: false,
+      isShow: false,
+      showEdit: false,
+      mode: 1, // 1新增 2浏览
+      rowID: "",
+      rowPhone: "",
+      uploading: false,
+      canPrint: false,
+      ExcutionNumber: "", // 确诊单编号
+      Handle: "", // 开单人姓名
+      // 确诊单合计金额
+      ConsumptionTotal: 0,
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 200,
+      onPrint: false,
+      number: true,
+      delDetailIndex: 0,
+      delPoup: false,
+      modal1: false,
+      StagingID: "",
+      CD: [],
+      formCy: 9,
+      formValidate: {
+        CustomerName: ""
+      },
+      formValidateRule: {
+        HandleBy: {
+          required: true,
+          message: "请选择开单人",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        userTel: "",
+        userName: ""
+      },
+      columns1: [
+        {
+          title: "开单日期",
+          key: "Date",
+          align: "center",
+          render: (h, params) => {
+            return echartsCommon.DATEsfm(h, params.row.Date);
+          }
+        },
+        {
+          title: "客户姓名",
+          key: "CustomerName",
+          align: "center"
+        },
+        {
+          title: "电话",
+          key: "CustomerPhone",
+          align: "center",
+          render: (h, params) => {
+            return echartsCommon.CustomerPhone(params.row.CustomerPhone);
+          }
+        },
+        {
+          title: "单据状态",
+          key: "StatusText",
+          align: "center"
+        },
+        {
+          title: "收费人",
+          key: "ChargeByName",
+          align: "center"
+        },
+        {
+          title: "收费日期",
+          key: "ChargeDate",
+          align: "center",
+          render: (h, params) => {
+            return echartsCommon.DATEsfm(h, params.row.Date);
+          }
+        },
+        {
+          title: "总价",
+          key: "Total",
+          align: "center",
+          render: (h, params) => {
+            return h("div", {}, params.row.Total.toFixed(2));
+          }
+        },
+        {
+          title: "减免金额",
+          key: "ReliefMoney",
+          align: "center",
+          render: (h, params) => {
+            return h("div", {}, params.row.ReliefMoney.toFixed(2));
+          }
+        },
+        {
+          title: "备注",
+          key: "Remark",
+          ellipsis: true,
+          align: "center",
+          render: (h, parmas) => {
+            return echartsCommon.ToolTip(h, parmas.row.Remark, 10);
+          }
+        },
+        {
+          title: " ",
+          align: "center",
+          width: 10
+        }
+      ],
+      list: [],
+      detailData: [],
+      chargeTableHead: [
+        {
+          title: "序号",
+          type: "index",
+          align: "center",
+          width: 80
+        },
+        {
+          title: "名称",
+          align: "center",
+          key: "Name",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input", {
+                props: {
+                  type: "text",
+                  placeholder: "请填写名称",
+                  value: that.chargeTableData[params.index].Name
+                    ? that.chargeTableData[params.index].Name
+                    : ""
+                },
+                on: {
+                  "input": e => {
+                    params.row.Name = e;
+                    that.chargeTableData[params.index] = params.row;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+
+        {
+          title: "价格",
+          align: "center",
+          key: "Price",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("InputNumber", {
+                props: {
+                  placeholder: "请填写金额",
+                  value: that.chargeTableData[params.index].Price
+                    ? that.chargeTableData[params.index].Price
+                    : 0,
+                  max: 99999999999,
+                  min: 0
+                },
+                on: {
+                  "on-change": e => {
+                    params.row.Price = e;
+                    that.chargeTableData[params.index] = params.row;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "数量",
+          align: "center",
+          key: "Num",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("InputNumber", {
+                props: {
+                  placeholder: "请填写金额",
+                  value: that.chargeTableData[params.index].Num
+                    ? that.chargeTableData[params.index].Num
+                    : 0,
+                  max: 99999999999,
+                  min: 0
+                },
+                on: {
+                  "on-change": e => {
+                    params.row.Num = e;
+                    that.chargeTableData[params.index] = params.row;
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          align: "center",
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-tianjia": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.addCharge(params.index);
+                    this.formCy = 9;
+                  }
+                },
+                style: {
+                  marginRight: "20px"
+                }
+              }),
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                on: {
+                  click: () => {
+                    this.delCharge(params.index);
+                  }
+                },
+                style: {
+                  marginRight: "5px"
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: " ",
+          align: "center",
+          width: 10
+        }
+      ],
+      printColumns: [
+        {
+          title: "项目名称",
+          align: "center",
+          width: 200,
+          key: "Name"
+        },
+        {
+          title: "数量",
+          align: "center",
+          key: "Quantity",
+          width: 200
+        },
+        {
+          title: "金额",
+          align: "center",
+          key: "Amount",
+          width: 200
+        }
+      ],
+      chargeTableData: [],
+      volumeTypes: [],
+      volumeTypesfenqi: [],
+      HandleList: [],
+      // 我的支付方式 保存文字
+      myPaymentMode: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    checkAuthor() {
+      let that = this;
+      let name = that.$route.name;
+      let list = that.authorList[name];
+      for (let i of list) {
+        if (i.Name === "增加") {
+          that.showAdd = i.IsVisible;
+        }
+        if (i.Name === "浏览") {
+          that.showEdit = i.IsVisible;
+        }
+      }
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      //判断两个时间段大小
+      echartsCommon.message = that.$Message;
+      if (
+        echartsCommon.ContrastTime(
+          that.formItem.startDate,
+          that.formItem.endDate
+        )
+      ) {
+        that.tablePage.page = 1;
+        that.getList();
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.tablePage.page = 1;
+      that.getList();
+    },
+    showDelDetailPoup(index) {
+      let that = this;
+      that.delDetailIndex = index;
+      that.delPoup = true;
+    },
+    delSingleDetail() {
+      // 删除单条收费详情
+      let that = this;
+      that.detailData.splice(that.delDetailIndex);
+    },
+
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.formValidate.Remark = "";
+      that.detailData = [];
+      that.CD = [];
+
+      that.chargeTableData = [];
+      that.modal1 = false;
+    },
+    tianjia() {
+      let that = this;
+      that.modal1 = true;
+      let a = {
+        Name: "",
+        Price: 0,
+        Num: 0
+      };
+      that.chargeTableData.push(a);
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.CustomerName = res.CustomerName;
+      that.formValidate.CustomerAge = res.CustomerAge;
+      that.formValidate.CustomerPhone = res.CustomerPhone;
+      that.formValidate.CustomerSex = res.CustomerSex;
+      that.formValidate.TMKEmployeeName = res.TMKEmployeeName;
+      that.formValidate.SceneEmployeeName = res.SceneEmployeeName;
+      that.formValidate.ArrearsBalance = Number(res.ArrearsBalance);
+      that.formValidate.HandselBalance = Number(res.HandselBalance);
+      that.formValidate.CashBalance = Number(res.CashBalance);
+      that.formValidate.IntegrationBalance = Number(res.IntegrationBalance);
+      that.formValidate.OrderID = res.OrderID;
+    },
+    addForm() {
+      let that = this;
+      console.log(that.chargeTableData);
+    },
+    uploadCharge() {
+      let that = this;
+      that.uploading = true;
+      let data = {
+        ExcutionNumber: that.ExcutionNumber,
+        HandleBy: that.userMes.EmployeeID,
+        Remark: that.formValidate.Remark,
+        PayDetails: []
+      };
+      for (let i of that.chargeTableData) {
+        i["StagingID"] = that.StagingID;
+        if (i.Amount > 0) {
+          data.PayDetails.push(i);
+        }
+      }
+      api.addCharge(data).then(response => {
+        that.uploading = false;
+        if (response.error_code === "Success") {
+          // that.$Message.success({
+          //     content: '添加成功'
+          // })
+          that.stopBC = true;
+          that.formValidate.OrderID = response.data;
+          that.resetSearch();
+          setTimeout(() => {
+            that.stopBC = false;
+          }, 2000);
+        } else {
+          that.$Message.error({
+            content: response.error_message
+          });
+        }
+      });
+    },
+    addCharge() {
+      // 添加收款方式
+      let that = this;
+      let a = {
+        Name: "",
+        Price: 0,
+        Num: 0
+      };
+      that.chargeTableData.push(a);
+    },
+    delCharge(index) {
+      // 删除收款方式
+      let that = this;
+      if (that.chargeTableData.length > 1) {
+        that.CD[index] = false;
+        that.chargeTableData.splice(index, 1);
+      }
+    },
+    showRemark(row) {
+      // 显示备注
+      let that = this;
+      that.$Modal.info({
+        title: "备注详情",
+        content: row.Remark
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        startDate: that.formItem.startDate,
+        endDate: that.formItem.endDate,
+        CustomerName: that.formItem.userName,
+        CustomerPhone: that.formItem.userTel,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum
+      };
+      // 转换日期
+      data.startDate = echartsCommon.changeTime(data.startDate);
+      data.endDate = echartsCommon.changeTime(data.endDate);
+      that.tableLoading = true;
+      // api.chargeGetList(data).then(response => {});
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      // 判断页面
+      that.checkAuthor();
+      that.getList();
+      that.isShow = btnQX.apiUrlList("Sf_shenhe");
+    });
+  },
+  filters: {
+    formatMoney(val) {
+      if (!val) {
+        return 0.0;
+      }
+      return Number(val).toFixed(2);
+    }
+  }
+};
+</script>
+<style>
+.ivu-table td.demo-table-info-column {
+  background-color: #2db7f5;
+}
+.ivu-table td.demo-table-info-cell-name {
+  background-color: #2db7f5;
+}
+.demo-table-info-cell-name.ivu-table-column-center > div.ivu-table-cell {
+  color: #fff !important;
+}
+</style>

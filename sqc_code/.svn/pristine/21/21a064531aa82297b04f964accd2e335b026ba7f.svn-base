@@ -1,0 +1,427 @@
+<template>
+  <div class="ygbb-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="startDate">
+              <DatePicker type="date" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="endDate">
+              <DatePicker type="date" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <Option value="all" @click.native="choose()">所有</Option>
+                <Option v-for="item in storeList" :value="item.ID" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="15">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn" @click="getList">查询</Button>
+              <Button type="warning" class="btn" @click="resetSearch">重置</Button>
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <!-- 图表 -->
+    <div class="form-box">
+      <!-- 门店业绩来人数据 -->
+      <div class="charts">
+        <div class="header">
+          门店业绩来人数据
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+    <!-- 表格 -->
+    <!-- <div class="table-box">
+            <div class="header">
+                门店业绩来人数据
+            </div>
+            <Table :columns="columns1" :data="list" highlight-row stripe :loading="tableLoading"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div> -->
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+export default {
+  data() {
+    return {
+      TotalAmount: 199999,
+      VisitorNumber: 199999,
+      ArrearsAmount: 199999,
+      TotalNewCustomerNumber: 0,
+      spinShow: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableLoading: false,
+      modal1: false,
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        store: "00003",
+        EmployeeID: ""
+      },
+      columns1: [
+        {
+          title: "门店",
+          key: "StoreName",
+          align: "center"
+        },
+        {
+          title: "总来人",
+          key: "VisitorNumber",
+          align: "center"
+        },
+        {
+          title: "总新客",
+          key: "TotalNewCustomerNumber",
+          align: "center"
+        },
+        {
+          title: "总业绩",
+          key: "TotalAmount",
+          align: "center"
+        },
+        {
+          title: "总欠款",
+          key: "ArrearsAmount",
+          align: "center"
+        },
+        {
+          title: "执行总额",
+          key: "ExecuteAmount",
+          align: "center"
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    choose(name, id) {
+      if (name === undefined && id === undefined) {
+        this.formItem.store = "所有";
+        this.formItem.StoreID = null;
+      } else {
+        this.formItem.store = name;
+        this.formItem.StoreID = id;
+      }
+    },
+    searchList() {
+      let that = this;
+      if (that.formItem.startDate && that.formItem.endDate) {
+        // 两者同时存在
+        if (Number(that.formItem.startDate) > Number(that.formItem.endDate)) {
+          that.$Message.error("开始日期不得大于结束日期");
+          return false;
+        }
+      }
+      that.getList();
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    setEcharts(pieData, barName) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          title: {
+            text: "某站点用户访问来源",
+            subtext: "",
+            x: "center"
+          },
+          tooltip: {
+            trigger: "item",
+            formatter: "{a} <br/>{b} : {c} ({d}%)"
+          },
+          legend: {
+            orient: "vertical",
+            left: "left",
+            data: barName
+          },
+          series: [
+            {
+              name: "访问来源",
+              type: "pie",
+              radius: "55%",
+              center: ["50%", "60%"],
+              data: pieData,
+              itemStyle: {
+                emphasis: {
+                  shadowBlur: 10,
+                  shadowOffsetX: 0,
+                  shadowColor: "rgba(0, 0, 0, 0.5)"
+                }
+              }
+            }
+          ]
+        };
+        dataSourcePie.setOption(optionPie);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    },
+    getList() {
+      let that = this;
+      let data = {
+        StartDate: that.formItem.startDate,
+        EndDate: that.formItem.endDate,
+        Stroe: that.formItem.store,
+        EmployeeID: that.userMes.EmployeeID
+      };
+      if (data.StartDate) {
+        data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+      }
+      if (data.EndDate) {
+        data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+      }
+      that.tableLoading = true;
+      that.spinShow = true;
+      api.getManageDataBT(data).then(response => {
+        that.tableLoading = false;
+        if (response.error_code === "Success") {
+          that.list = response.data;
+          that.setPieData();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getValidStoresNew(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setPieData() {
+      let that = this;
+      let pieData = [];
+      let barName = [];
+      for (let i in that.list) {
+        // 饼图
+        let a = {
+          value: that.list[i].Value,
+          name: that.list[i].Name
+        };
+        pieData.push(a);
+        barName.push(that.list[i].Name);
+      }
+      that.setEcharts(pieData, barName);
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+    that.getStore();
+    // that.setAuthor
+  }
+};
+</script>
+<style>
+.ygbb-container {
+  width: 100%;
+  position: relative;
+  padding: 72px 0px;
+  background: #f0f0f0;
+  border-radius: 0;
+  overflow: visible !important;
+}
+.ygbb-container .search-box {
+  border-radius: 5px;
+  background: #fff;
+  padding: 10px 20px;
+}
+.ygbb-container .header {
+  position: absolute;
+  padding-left: 22px;
+  font-size: 14px;
+  height: 40px;
+  line-height: 40px;
+  top: 0;
+  width: 100%;
+  left: 0;
+}
+.ygbb-container .header:before {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 15px;
+  top: 50%;
+  margin-top: -7.5px;
+  left: 10px;
+  background: #79aa49;
+}
+.ygbb-container .header:after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: #79aa49;
+  left: 0;
+  bottom: 0;
+}
+.ygbb-container .form-box {
+  background: #f0f0f0;
+  height: 480px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+.ygbb-container .form-box > .charts {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  width: 20%;
+  padding-top: 40px;
+  height: 100%;
+  flex: 1;
+  margin-right: 30px;
+}
+.ygbb-container .form-box .content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.ygbb-container .form-box > .charts:first-child {
+  flex: 2;
+}
+.ygbb-container .form-box > .charts:nth-child(2) {
+  flex: 3;
+}
+.ygbb-container .form-box > .charts:nth-child(3) {
+  margin-right: 0;
+}
+.ygbb-container #data_source_com,
+.ygbb-container #data_source_fb {
+  height: 100%;
+  width: 100%;
+}
+.ygbb-container .form-box .charts .no-form {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  padding: 0 5%;
+  height: 100%;
+}
+.ygbb-container .form-box .charts .progress-box {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.ygbb-container .table-box {
+  position: relative;
+  padding: 60px 20px;
+  border-radius: 8px;
+  background: #fff;
+  height: auto !important;
+  box-sizing: border-box;
+  margin-bottom: 40px;
+}
+.ygbb-container .form-box .charts .no-form .progress-box > div:nth-child(1) {
+  color: #333333;
+  font-size: 14px;
+}
+.ygbb-container .form-box .charts .no-form .progress-box > div:nth-child(2) {
+  color: #666666;
+  font-size: 14px;
+}
+.ygbb-container
+  .form-box
+  .charts
+  .no-form
+  .progress-box:nth-child(1)
+  .ivu-progress-bg {
+  background-color: #fcc522;
+}
+.ygbb-container
+  .form-box
+  .charts
+  .no-form
+  .progress-box:nth-child(2)
+  .ivu-progress-bg {
+  background-color: #7db14a;
+}
+.ygbb-container
+  .form-box
+  .charts
+  .no-form
+  .progress-box:nth-child(3)
+  .ivu-progress-bg {
+  background-color: #d94e81;
+}
+</style>
+

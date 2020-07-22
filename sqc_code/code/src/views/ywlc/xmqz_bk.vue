@@ -1,0 +1,1667 @@
+<template>
+    <div class="xmqz-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+                <row :gutter="20">
+                    <i-col span="3">
+                        <formItem prop="startDate">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="开始日期" v-model="formItem.startDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <formItem prop="endDate">
+                            <DatePicker class="DatePicker_time" type="date" :options="options1" placeholder="结束日期" v-model="formItem.endDate" :clearable="false" :editable="false"></DatePicker>
+                        </formItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userName">
+                            <Input v-model="formItem.userName" placeholder="姓名"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="3">
+                        <FormItem prop="userTel">
+                            <Input v-model="formItem.userTel" placeholder="电话"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="12">
+                        <formItem class="btn-box">
+                            <i-button type="primary" class="btn" @click="searchForm">搜索</i-button>
+                            <i-button type="warning" class="btn" @click="resetSearch">重置</i-button>
+                            <i-button type="primary" class="btn btn-add" @click="changeMode(0)" v-if="showAdd">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="changeMode(1)" v-if="showEdit" :disabled="!currentID">修改</i-button>
+                            <i-button type="error" class="btn" @click="changeMode(2)" v-if="showLook" :disabled="!currentID">浏览</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="chooseRow"></Table>
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+                <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+            </Select>
+            <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost" @click="prevPage">上一页</i-button>
+            <i-button class="btn btn-next" type="primary" @click="nextPage">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+                <p>页</p>
+            </div>
+        </div>
+        <!-- 弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" width="1000" :scrollable="true" class="dialog" v-if="showAdd || showEdit">
+            <div slot='header' class="header not-print">
+                {{setModelTitle}}
+            </div>
+            <div slot='close' class="close not-print">
+                <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+            </div>
+            <!-- 用户信息部分 不可修改 -->
+            <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+                <row type="flex" justify="space-between">
+                    <i-col span="6">
+                        <FormItem prop="CustomerPhone" label="电话：">
+                            <Input v-model="formValidate.CustomerPhone" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem prop="CustomerName" label="姓名：">
+                            <Input v-model="formValidate.CustomerName" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="年龄：" prop="CustomerAge">
+                            <Input v-model="formValidate.CustomerAge" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem prop="CustomerSex" label="性别：">
+                            <Input v-model="formValidate.CustomerSex" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="6">
+                        <FormItem label="预交余额：" prop="CashBalance">
+                            <InputNumber v-model="formValidate.CashBalance" placeholder="无" :disabled="true" :precision="2" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="积分余额：" prop="IntegrationBalance">
+                            <InputNumber v-model="formValidate.IntegrationBalance" placeholder="无" :disabled="true" :precision="2" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="欠款余额：" prop="ArrearsBalance">
+                            <InputNumber v-model="formValidate.ArrearsBalance" placeholder="无" :disabled="true" :precision="2" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="赠送余额：" prop="HandselBalance">
+                            <InputNumber v-model="formValidate.HandselBalance" placeholder="无" :disabled="true" :precision="2" style="width:100%;"></InputNumber>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex">
+                    <i-col span="6">
+                        <FormItem label="美肤总监：" prop="SceneEmployeeName">
+                            <Input v-model="formValidate.SceneEmployeeName" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                    <i-col span="6">
+                        <FormItem label="渠道咨询：" prop="TMKEMployeeName">
+                            <Input v-model="formValidate.TMKEMployeeName" placeholder="无" :disabled="true"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <!-- ** -->
+            </Form>
+            <!-- 确诊单明细 -->
+            <div class="pannel-title">
+                <p>物资列表</p>
+                <div class="btn-add" style="margin-right:20px;" @click="showSmallModal(0)" v-if="mode !== 2">
+                    <icon type="aaa-tianjia"></icon>
+                </div>
+            </div>
+            <!-- 添加、修改 -->
+            <div class="table-box" style="margin-top:0;margin-bottom:20px;" v-if="mode !== 2">
+                <i-table stripe :columns="wzColumns" :data="wzData" :height="200"></i-table>
+            </div>
+            <!-- 浏览 -->
+            <div class="table-box" style="margin-top:0;margin-bottom:20px;" v-else>
+                <i-table stripe :columns="wzlookColumns" :data="wzData" :height="200"></i-table>
+            </div>
+            <div class="pannel-title">
+                <p>项目列表</p>
+                <div class="btn-add" style="margin-right:20px;" @click="showSmallModal(1)" v-if="mode !== 2">
+                    <icon type="aaa-tianjia"></icon>
+                </div>
+            </div>
+            <!-- 添加、修改 -->
+            <div class="table-box" style="margin-top:0;margin-bottom:20px;" v-if="mode !== 2">
+                <i-table stripe :columns="xmColumns" :data="xmData" :height="200"></i-table>
+            </div>
+            <!-- 浏览 -->
+            <div class="table-box" style="margin-top:0;margin-bottom:20px;" v-else>
+                <i-table stripe :columns="xmlookColumns" :data="xmData" :height="200"></i-table>
+            </div>
+            <row type="flex" justify="end" style="margin-bottom: 20px; color: #fc5427; font-size: 14px; font-weight: bold;">
+                <i-col>
+                    合计：{{calSum | formatMoney}}
+                </i-col>
+            </row>
+            <Input v-model="formValidate.Remark" placeholder="无" type="textarea" :rows="4" readonly v-if="mode == 2"></Input>
+            <Input v-model="formValidate.Remark" placeholder="备注" type="textarea" :rows="4" v-else></Input>
+            <!-- ** -->
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="addForm" :loading="onLoading" v-if="mode !== 2">保存</Button>
+                <Button class="btn" type="warning" @click="resetForm" :loading="onLoading" v-if="mode !== 2">取消</Button>
+            </div>
+        </Modal>
+        <!-- 物资/项目弹窗 -->
+        <Modal :mask-closable="false" v-model="modal2" width="800" class="dialog" v-if="showAdd || showEdit">
+            <div slot='header' class="header not-print">
+                选择
+            </div>
+            <div slot='close' class="close not-print">
+                <i class='ivu-icon ivu-icon-aaa-guanbi'></i>
+            </div>
+            <Input v-model="searchKeyWord" placeholder="请输入项目名称" style="width: 300px; margin: 2px 0 2px 0;" icon="search"></Input>
+            <div class="table-box">
+                <!-- 物资 -->
+                <i-table stripe :columns="materialsColumn" :data="setMaterialtData" @on-selection-change="selectMaterial" :height="500" v-if="tabIndex == 0"></i-table>
+                <!-- 项目 -->
+                <i-table stripe :columns="projectColumn" :data="setProjectData" @on-selection-change="selectMaterial" :height="500" v-else></i-table>
+            </div>
+            <div slot="footer" class="footer not-print">
+                <Button class="btn" type="primary" @click="smalladdForm" :loading="onLoading">保存</Button>
+                <Button class="btn" type="warning" @click="smallResetForm" :loading="onLoading">取消</Button>
+            </div>
+        </Modal>
+        <!-- 查询电话号码弹窗 -->
+        <Modal :mask-closable="false" v-model="poupSearchTel" class="dialog" v-if="showAdd">
+            <div slot='header' class="header">
+                请输入电话号码
+            </div>
+            <Form :model="searchTel" ref="searchTelForm" @submit.native.prevent="searchCustomerTel">
+                <Form-item prop="tel" :rules="searchRule.tel">
+                    <i-input v-model="searchTel.tel" placeholder="请输入用户的手机号" autofocus ref="searchTel"></i-input>
+                </Form-item>
+            </Form>
+            <div slot='footer' class="footer">
+                <i-button type="primary" class="btn" @click="searchCustomerTel" :loading="onLoading">确定</i-button>
+                <i-button type="warning" class="btn" @click="searchReset" :loading="onLoading">取消</i-button>
+            </div>
+        </Modal>
+    </div>
+</template>
+<script>
+const Decimal = require("decimal");
+import Vue from "vue";
+import storejs from "storejs";
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    const validateTel = (rule, value, callback) => {
+      let reg = /^1\d{10}$/;
+      if (value === "") {
+        callback(new Error("手机号不得为空"));
+      } else if (!reg.test(value)) {
+        callback(new Error("请输入正确的手机号"));
+      } else {
+        callback();
+      }
+    };
+    return {
+      //时间回到今天
+      options1: echartsCommon.shortcuts(),
+      // -----
+      calSum: 0,
+      mode: 0, // 0增加 1修改  2浏览
+      showEdit: false,
+      showAdd: false,
+      showLook: false,
+      modalTitle: "修改",
+      currentID: null,
+      searchKeyWord: "",
+      // 确诊单ID
+      DetailId: "",
+      onLoading: false,
+      poupSearchTel: false,
+      rowID: "",
+      rowStatus: "",
+      searchTel: {
+        tel: ""
+      },
+      searchRule: {
+        tel: {
+          required: true,
+          message: "请输入正确的手机号码",
+          trigger: "blur",
+          type: "number",
+          validator: validateTel
+        }
+      },
+      tabIndex: 0,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0,
+        row: 10
+      },
+      tableHeight: 200,
+      tableLoading: false,
+      onPrint: false,
+      number: true,
+      delPoup: false,
+      modal1: false,
+      modal2: false,
+      formValidate: {
+        CustomerPhone: "",
+        CustomerName: "",
+        CustomerAge: "",
+        CustomerSex: "",
+        TMKEMployeeName: "",
+        SceneEmployeeName: "",
+        ArrearsBalance: 0,
+        HandselBalance: 0,
+        CashBalance: 0,
+        IntegrationBalance: 0,
+        HandleBy: "",
+        Remark: ""
+      },
+      formValidateRule: {
+        HandleBy: {
+          required: true,
+          message: "请选择开单人",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        startDate: new Date(),
+        endDate: new Date(),
+        userTel: "",
+        userName: ""
+      },
+      // 主表格行
+      columns1: [
+        {
+          title: "登记日期",
+          key: "Date",
+          width: 140,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.Date) {
+              return "";
+            }
+            return h("div", {}, moment(params.row.Date).format("YYYY-MM-DD"));
+          }
+        },
+        {
+          title: "客户姓名",
+          width: 140,
+          key: "CustomerName",
+          align: "center"
+        },
+        {
+          title: "性别",
+          width: 140,
+          key: "CustomerSex",
+          align: "center"
+        },
+        {
+          title: "年龄",
+          width: 140,
+          key: "CustomerAge",
+          align: "center"
+        },
+        {
+          title: "电话",
+          width: 140,
+          key: "CustomerPhone",
+          align: "center"
+        },
+        {
+          title: "单据状态",
+          width: 140,
+          key: "StatusText",
+          align: "center"
+        },
+        {
+          title: "总价",
+          width: 140,
+          key: "Total",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.Total) {
+              return "";
+            }
+            return h(
+              "div",
+              {
+                // style: {
+                //     'text-align': 'right'
+                // }
+              },
+              params.row.Total.toFixed(2)
+            );
+          }
+        },
+        {
+          title: "门店",
+          width: 140,
+          key: "StoreName",
+          align: "center"
+        },
+        {
+          title: "开单人",
+          width: 140,
+          key: "HandleByName",
+          align: "center"
+        },
+        {
+          title: "收费人",
+          width: 140,
+          key: "ChargeByName",
+          align: "center"
+        },
+        {
+          title: "收费日期",
+          width: 140,
+          key: "ChargeDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.ChargeDate) {
+              return "";
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.ChargeDate).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: "备注",
+          width: 140,
+          key: "Remark",
+          ellipsis: true,
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.Remark) {
+              return "";
+            }
+            let text =
+              params.row.Remark.length > 10
+                ? params.row.Remark.substr(0, 10) + "...."
+                : params.row.Remark;
+            return h(
+              "div",
+              {
+                on: {
+                  click: () => {
+                    this.showRemark(params.row);
+                  }
+                }
+              },
+              text
+            );
+          }
+        },
+        {
+          title: " "
+        }
+      ],
+      list: [],
+      alreadyPaid: false,
+      wzColumns: [
+        {
+          title: "名称",
+          key: "projectName",
+          align: "center",
+          width: 200
+        },
+        {
+          title: "规格",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "数量",
+          key: "num",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写数量",
+                  value: params.row.num,
+                  max: 9999999,
+                  min: 1
+                },
+                on: {
+                  "on-change": function(e) {
+                    that.$nextTick(() => {
+                      params.row.num = e;
+                      let nRate = that.formatData(
+                        Decimal.div(params.row.rate, 100).toNumber()
+                      );
+                      params.row.sum = that.formatData(
+                        params.row.price * params.row.num * nRate
+                      );
+                      that.wzData[params.index] = params.row;
+                      that.calSumMoney();
+                    });
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "单价",
+          key: "price",
+          align: "center",
+          width: 100,
+          render: (h, params) => {
+            let that = this;
+            // return h('div', {}, Number(params.row.price).toFixed(2))
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写单价",
+                  value: Number(params.row.price),
+                  max: 999999999,
+                  min: Number(params.row.oldPrice)
+                },
+                style: {
+                  marginRight: "8px"
+                },
+                on: {
+                  "on-change": function(e) {
+                    if (e < 0) {
+                      params.row.price = 0;
+                    }
+                    params.row.price = e;
+                    let nRate = that.formatData(
+                      Decimal.div(params.row.rate, 100).toNumber()
+                    );
+                    params.row.sum = that.formatData(
+                      e * params.row.num * nRate
+                    );
+                    that.wzData[params.index] = params.row;
+                    that.calSumMoney();
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "折扣(%)",
+          key: "rate",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写折扣",
+                  value: params.row.rate,
+                  max: 100,
+                  min: 0,
+                  step: 0.01
+                },
+                on: {
+                  "on-change": function(e) {
+                    // params.row.rate = parseInt(e * 100 + 0.5) / 100
+                    params.row.rate = e;
+                    let nRate = Decimal.div(e, 100).toNumber();
+                    params.row.sum = that.formatData(
+                      params.row.price * params.row.num * nRate
+                    );
+                    that.wzData[params.index] = params.row;
+                    that.calSumMoney();
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "总价",
+          key: "sum",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写总价",
+                  value: params.row.sum,
+                  // value: params.row.sum,
+                  max: params.row.price * params.row.num,
+                  min: 0
+                },
+                on: {
+                  "on-change": function(e) {
+                    params.row.sum = e;
+                    // mul乘法
+                    let c = Decimal.mul(
+                      params.row.price,
+                      params.row.num
+                    ).toNumber();
+                    let a = Decimal.div(e, c).toNumber() * 100;
+                    // 正常计算
+                    if (a <= 100) {
+                      params.row.rate = Number(a.toFixed(2));
+                      // 折扣超过 100%
+                    } else {
+                      params.row.rate = 100;
+                      that.$Message.error("折扣不得超过100%");
+                      params.row.sum = that.formatData(
+                        Decimal.mul(params.row.price, params.row.num).toNumber()
+                      );
+                    }
+                    that.wzData[params.index] = params.row;
+                    that.calSumMoney();
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          key: "action",
+          align: "center",
+          width: 80,
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                style: {},
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.row.type, params.index);
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      xmColumns: [
+        {
+          title: "名称",
+          key: "projectName",
+          align: "center",
+          width: 200
+        },
+        {
+          title: "规格",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "数量",
+          key: "num",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写数量",
+                  value: params.row.num,
+                  max: 9999999,
+                  min: 1
+                },
+                on: {
+                  "on-change": function(e) {
+                    that.$nextTick(() => {
+                      let nRate = Decimal.div(params.row.rate, 100).toNumber();
+                      params.row.num = e;
+                      params.row.sum = that.formatData(
+                        e * params.row.price * nRate
+                      );
+                      that.xmData[params.index] = params.row;
+                      that.calSumMoney();
+                    });
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "单价",
+          key: "price",
+          align: "center",
+          width: 100,
+          render: (h, params) => {
+            let that = this;
+            if (!params.row.canChangePrice) {
+              return h("div", {}, that.formatData(params.row.price));
+            }
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写单价",
+                  value: params.row.price,
+                  max: params.row.highPrice,
+                  min: params.row.lowPrice
+                },
+                style: {
+                  marginRight: "8px"
+                },
+                on: {
+                  "on-change": function(e) {
+                    if (e < 0) {
+                      params.row.price = 0;
+                    }
+                    params.row.price = e;
+                    let nRate = Decimal.div(params.row.rate, 100).toNumber();
+                    params.row.sum = Number(
+                      (e * params.row.num * nRate).toFixed(2)
+                    );
+                    that.xmData[params.index] = params.row;
+                    that.calSumMoney();
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "折扣(%)",
+          key: "rate",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写折扣",
+                  value: params.row.rate,
+                  max: 100,
+                  min: 0,
+                  step: 0.1
+                },
+                on: {
+                  "on-change": function(e) {
+                    let a = params.row.oldPrice;
+                    params.row.price = a;
+                    params.row.rate = e;
+                    let nRate = Decimal.div(e, 100);
+                    params.row.sum = that.formatData(
+                      nRate * params.row.price * params.row.num
+                    );
+                    // params.row.sum = Decimal.mul(nRate, params.row.price, params.row.num).toNumber()
+                    that.xmData[params.index] = params.row;
+                    that.calSumMoney();
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "总价",
+          key: "sum",
+          align: "center",
+          render: (h, params) => {
+            let that = this;
+            return h("div", [
+              h("Input-number", {
+                props: {
+                  placeholder: "填写总价",
+                  value: params.row.sum,
+                  // value: params.row.sum,
+                  max: params.row.price * params.row.num,
+                  min: 0
+                },
+                on: {
+                  "on-change": function(e) {
+                    params.row.sum = e;
+                    let c = that.formatData(
+                      Decimal.mul(params.row.price, params.row.num).toNumber()
+                    );
+                    let a = that.formatData(Decimal.div(e, c).toNumber());
+                    // 正常计算
+                    if (a <= 1) {
+                      let d = Number(a * 100);
+                      params.row.rate = Number(d.toFixed(2));
+                      // 折扣超过 100
+                    } else {
+                      // let price = Decimal.div(e, params.row.num).toNumber()
+                      // if (price < params.row.lowPrice) {
+                      //     // 单价超过最低
+                      //     that.$Message.error(`该项目最低单价为${params.row.lowPrice}`)
+                      //     params.row.sum = Number((params.row.lowPrice * 1).toFixed(2))
+                      // } else if (price > params.row.highPrice) {
+                      //     // 单价超过最高单价
+                      //     that.$Message.error(`该项目最高单价为${params.row.highPrice}`)
+                      //     params.row.sum = Number((params.row.highPrice * 1).toFixed(2))
+                      // } else {
+                      //     params.row.price = price
+                      // }
+
+                      params.row.rate = 100;
+                    }
+                    that.xmData[params.index] = params.row;
+                    that.calSumMoney();
+                    // that.$set(that.xmData, params.index, params.row)
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: "操作",
+          key: "action",
+          align: "center",
+          width: 80,
+          render: (h, params) => {
+            return h("div", [
+              h("i", {
+                class: {
+                  "ivu-icon": true,
+                  "ivu-icon-aaa-icon-shanchu": true,
+                  "icon-btn": true
+                },
+                style: {},
+                on: {
+                  click: () => {
+                    this.showDelDetailPoup(params.row.type, params.index);
+                  }
+                }
+              })
+            ]);
+          }
+        },
+        {
+          title: " ",
+          width: 10
+        }
+      ],
+      wzlookColumns: [
+        {
+          title: "名称",
+          key: "projectName",
+          align: "center",
+          width: 200
+        },
+        {
+          title: "规格",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "数量",
+          key: "num",
+          align: "center"
+        },
+        {
+          title: "单价",
+          key: "price",
+          align: "center",
+          width: 100,
+          render: (h, params) => {
+            if (!params.row.price) {
+              return 0.0;
+            }
+            return h("div", {}, params.row.price.toFixed(2));
+          }
+        },
+        {
+          title: "折扣",
+          key: "rate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.rate) {
+              return "0%";
+            }
+            return h("div", {}, params.row.rate + "%");
+          }
+        },
+        {
+          title: "总价",
+          key: "sum",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.sum) {
+              return 0.0;
+            }
+            return h("div", {}, params.row.sum.toFixed(2));
+          }
+        }
+      ],
+      xmlookColumns: [
+        {
+          title: "名称",
+          key: "projectName",
+          align: "center",
+          width: 200
+        },
+        {
+          title: "规格",
+          key: "gg",
+          align: "center"
+        },
+        {
+          title: "数量",
+          key: "num",
+          align: "center"
+        },
+        {
+          title: "单价",
+          key: "price",
+          align: "center",
+          width: 100,
+          render: (h, params) => {
+            if (!params.row.price) {
+              return 0.0;
+            }
+            return h("div", {}, params.row.price.toFixed(2));
+          }
+        },
+        {
+          title: "折扣",
+          key: "rate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.rate) {
+              return "0%";
+            }
+            return h("div", {}, params.row.rate + "%");
+          }
+        },
+        {
+          title: "总价",
+          key: "sum",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.sum) {
+              return 0.0;
+            }
+            return h("div", {}, params.row.sum.toFixed(2));
+          }
+        }
+      ],
+      selection: [],
+      xmData: [],
+      wzData: [],
+      volumeTypes: [],
+      projectColumn: [
+        {
+          type: "selection",
+          width: 80
+        },
+        {
+          title: "名称",
+          key: "Name",
+          align: "center"
+        },
+        {
+          title: "名称简码",
+          key: "SimpleCode",
+          align: "center"
+        },
+        {
+          title: "规格",
+          key: "Standard",
+          align: "center"
+        },
+        {
+          title: "单位",
+          key: "Unit",
+          align: "center"
+        },
+        {
+          title: "可否修改单价",
+          key: "CanChangePrice",
+          align: "center",
+          render: (h, params) => {
+            let text = "否";
+            if (params.row.CanChangePrice) {
+              text = "是";
+            }
+            return h("div", {}, text);
+          }
+        },
+        {
+          title: "单价",
+          key: "UnitPrice",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.UnitPrice) {
+              return 0.0;
+            }
+            return h("div", {}, params.row.UnitPrice.toFixed(2));
+          }
+        }
+      ],
+      projectTypeList: [],
+      materialsColumn: [
+        {
+          type: "selection",
+          width: 80
+        },
+        {
+          title: "名称",
+          key: "Name",
+          align: "center"
+        },
+        {
+          title: "名称简码",
+          key: "SimpleCode",
+          align: "center"
+        },
+        {
+          title: "规格",
+          key: "Standard",
+          align: "center"
+        },
+        {
+          title: "单位",
+          key: "Unit",
+          align: "center"
+        },
+        {
+          title: "单价",
+          key: "UnitPrice",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.UnitPrice) {
+              return 0.0;
+            }
+            return h("div", {}, params.row.UnitPrice.toFixed(2));
+          }
+        }
+      ],
+      materialsData: [],
+      projectListData: [],
+      HandleList: [],
+      myPaymentMode: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows,
+      authorList: state => state.app.authorList
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    },
+    setMaterialtData() {
+      // 过滤物资列表
+      let that = this;
+      let arr = [];
+      let idList = [];
+      let keyWord = that.searchKeyWord;
+      // 选中的商品不会出现在待选列表中
+      for (let i of that.wzData) {
+        idList.push(i.id);
+      }
+      for (let i of that.materialsData) {
+        if (idList.indexOf(i.ID) <= -1) {
+          // 搜索
+          if (
+            i.Name.indexOf(keyWord) > -1 ||
+            i.SimpleCode.indexOf(keyWord) > -1
+          ) {
+            arr.push(i);
+          }
+        }
+      }
+      return arr;
+    },
+    setProjectData() {
+      // 过滤项目列表
+      let that = this;
+      let arr = [];
+      let keyWord = that.searchKeyWord;
+      let idList = [];
+      for (let i of that.xmData) {
+        idList.push(i.id);
+      }
+      for (let i of that.projectListData) {
+        if (idList.indexOf(i.ID) <= -1) {
+          // 搜索
+          if (
+            i.Name.indexOf(keyWord) > -1 ||
+            i.SimpleCode.indexOf(keyWord) > -1
+          ) {
+            arr.push(i);
+          }
+        }
+      }
+      return arr;
+    },
+    setModelTitle() {
+      let that = this;
+      switch (that.mode) {
+        case 0:
+          return "新增";
+        case 1:
+          return "修改";
+        case 2:
+          return "浏览";
+      }
+    }
+  },
+  methods: {
+    changeMode(type) {
+      let that = this;
+      that.mode = type;
+      that.calSum = 0;
+      if (type === 0) {
+        // 新增
+        that.resetForm();
+        that.resetSearch();
+        that.poupSearchTel = true;
+        that.$nextTick(() => {
+          that.$refs.searchTel.focus();
+        });
+        return false;
+      } else if (type === 1) {
+        // 修改
+        that.checkBillStatus();
+        return false;
+      }
+      // 浏览
+      if (!that.currentID) {
+        that.$Message.error("请选择一条订单");
+        return false;
+      }
+      // api.getConsumptions(that.currentID).then((response) => {
+      // if (response.error_code === 'Success') {
+      that.getDetail(that.currentID);
+      // } else {
+      // that.$Message.error(response.error_message)
+      // }
+      // })
+    },
+    checkAuthor() {
+      let that = this;
+      let name = that.$route.name;
+      let list = that.authorList[name];
+      for (let i of list) {
+        if (i.Name === "增加") {
+          that.showAdd = i.IsVisible;
+        }
+        if (i.Name === "浏览") {
+          that.showLook = i.IsVisible;
+        }
+        if (i.Name === "修改") {
+          that.showEdit = i.IsVisible;
+        }
+      }
+    },
+    chooseRow(row) {
+      // 选中某一行修改
+      let that = this;
+      that.currentID = row.ID;
+      that.rowStatus = row.StatusText;
+    },
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      //判断两个时间段大小
+     
+      if (
+        echartsCommon.ContrastTime(
+          this.$Message,
+          that.formItem.startDate,
+          that.formItem.endDate
+        )
+      ) {
+        that.tablePage.page = 1;
+        that.getList();
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    searchCustomerTel() {
+      let that = this;
+      let isBreak = false;
+      that.$refs.searchTelForm.validate(validate => {
+        if (!validate) {
+          isBreak = true;
+          return false;
+        }
+      });
+      if (isBreak) {
+        return false;
+      }
+      // 搜索...
+      let data = {
+        CustomerPhone: that.searchTel.tel,
+        EmployeeID: that.userMes.EmployeeID
+      };
+      that.onLoading = true;
+      api.getCustomerByPhone(data).then(response => {
+        that.onLoading = false;
+        if (response.error_code === "Success") {
+          that.poupSearchTel = false;
+          that.formValidate.CustomerID = response.data.ID;
+          that.setData(response.data);
+          that.modal1 = true;
+          that.$refs.searchTelForm.resetFields();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setData(res) {
+      let that = this;
+      that.formValidate.CustomerName = res.Name;
+      that.formValidate.CustomerAge = res.Age;
+      that.formValidate.CustomerPhone = res.Phone;
+      that.formValidate.CustomerSex = res.Sex;
+      that.formValidate.TMKEmployeeName = res.TMKEmployeeName;
+      that.formValidate.SceneEmployeeName = res.SceneEmployeeName;
+      that.formValidate.ArrearsBalance = Number(res.ArrearsBalance);
+      that.formValidate.HandselBalance = Number(res.HandselBalance);
+      that.formValidate.CashBalance = Number(res.CashBalance);
+      that.formValidate.IntegrationBalance = Number(res.IntegrationBalance);
+    },
+    searchReset() {
+      let that = this;
+      that.$refs.searchTelForm.resetFields();
+      that.poupSearchTel = false;
+    },
+    showDelDetailPoup(type, index) {
+      let that = this;
+      if (type == "wz") {
+        that.wzData.splice(index, 1);
+      } else if (type == "xm") {
+        that.xmData.splice(index, 1);
+      }
+      that.calSumMoney();
+    },
+    resetForm() {
+      let that = this;
+      that.wzData = [];
+      that.xmData = [];
+      that.DetailId = "";
+      that.formValidate.Remark = "";
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    checkBillStatus() {
+      let that = this;
+      if (!that.currentID) {
+        that.$Message.error("请选择一条订单");
+        return false;
+      }
+      if (that.rowStatus !== "未收费") {
+        that.$Message.error("该订单已收费，不可修改");
+        return false;
+      }
+      that.resetForm();
+      // api.getConsumptions(that.currentID).then((response) => {
+      // if (response.error_code === 'Success') {
+      that.getDetail(that.currentID);
+      // } else {
+      // that.$Message.error(response.error_message)
+      // }
+      // })
+    },
+    getDetail(id) {
+      // 获取确诊单明细
+      let that = this;
+      that.$store.commit("changeLoadingPage");
+      api.getConsumptions(id).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          // 设置数据
+          that.setDetail(response.data);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    setDetail(res) {
+      // 获取确诊详情并设置数据
+      let that = this;
+      that.formValidate.CustomerID = res.CustomerID;
+      // that.searchTel.tel = res.CustomerPhone
+      // that.searchCustomerTel()
+      that.setData(res);
+      that.formValidate.Remark = res.Remark;
+      that.formValidate.HandleBy = res.HandleBy;
+      that.DetailId = res.ID;
+      for (let i in res.ConsumptionDetails) {
+        let dom = res.ConsumptionDetails[i];
+        let a = {
+          id: "",
+          sum: Number(dom.Amount.toFixed(2)),
+          rate: dom.Sconto,
+          num: dom.Quantity,
+          price: dom.Price,
+          oldPrice: dom.Price,
+          lowPrice: dom.MinPrice,
+          highPrice: dom.MaxPirce,
+          gg: dom.Standard,
+          projectName: dom.Name,
+          type: ""
+        };
+        if (dom.ItemID) {
+          // 项目
+          a.id = dom.ItemID;
+          a.type = "xm";
+          that.xmData.push(a);
+        } else {
+          // 物资
+          a.id = dom.GoodsID;
+          a.type = "wz";
+          that.wzData.push(a);
+        }
+      }
+      that.modal1 = true;
+      that.calSumMoney();
+    },
+    setUploadData() {
+      // 设置提交数据
+      let that = this;
+      let data = {
+        CustomerID: that.formValidate.CustomerID,
+        RegistBy: that.userMes.EmployeeID,
+        HandleBy: that.userMes.EmployeeID,
+        // HandleBy: that.formValidate.HandleBy,
+        ConsumptionTotal: 0,
+        Remark: that.formValidate.Remark,
+        ConsumptionDetails: []
+      };
+      // 添加物资记录
+      for (let i in that.wzData) {
+        data.ConsumptionTotal += that.wzData[i].sum;
+        let a = {
+          GoodsID: that.wzData[i].id,
+          Price: Number(that.wzData[i].price),
+          Quantity: that.wzData[i].num,
+          Sconto: that.wzData[i].rate,
+          Amount: Number(that.wzData[i].sum),
+          Remark: ""
+        };
+        data.ConsumptionDetails.push(a);
+      }
+      // 添加项目记录
+      for (let i in that.xmData) {
+        data.ConsumptionTotal += that.xmData[i].sum;
+        let a = {
+          ItemID: that.xmData[i].id,
+          Price: Number(that.xmData[i].price),
+          Quantity: that.xmData[i].num,
+          Sconto: that.xmData[i].rate,
+          Amount: Number(that.xmData[i].sum),
+          Remark: ""
+        };
+        data.ConsumptionDetails.push(a);
+      }
+      data.ConsumptionTotal = that.formatData(data.ConsumptionTotal);
+      return data;
+    },
+    addForm() {
+      let that = this;
+      if (that.wzData.length <= 0 && that.xmData.length <= 0) {
+        that.$Message.error("请选择项目或物资");
+        return false;
+      }
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          that.onLoading = true;
+          if (that.DetailId) {
+            // 有确诊单ID调用修改接口
+            that.modifyForm();
+            return false;
+          }
+          api.consumptions(that.setUploadData()).then(response => {
+            that.onLoading = false;
+            if (response.error_code === "Success") {
+              that.$Message.success("提交成功");
+              that.$refs.formValidate1.resetFields();
+              that.wzData = [];
+              that.DetailId = "";
+              that.xmData = [];
+              that.getList();
+              that.modal1 = false;
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+        } else {
+          that.$Message.error("请选择开单人");
+        }
+      });
+    },
+    modifyForm() {
+      let that = this;
+      // if (that.wzData.length <= 0 && that.xmData.length <= 0) {
+      //     that.$Message.error('请选择项目或物资')
+      //     return false
+      // }
+      api
+        .modiefyConsumptions(that.DetailId, that.setUploadData())
+        .then(response => {
+          that.onLoading = false;
+          if (response.error_code === "Success") {
+            that.$Message.success("修改成功");
+            that.$refs.formValidate1.resetFields();
+            that.wzData = [];
+            that.xmData = [];
+            that.DetailId = "";
+            that.getList();
+            that.modal1 = false;
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+    },
+    // 选择物资
+    selectMaterial(selection) {
+      let that = this;
+      // 选中的物资/药物列表
+      that.selection = selection;
+    },
+    smalladdForm() {
+      let that = this;
+      // 选择物资
+      if (that.tabIndex === 0) {
+        // 物资
+        for (let i in that.selection) {
+          let a = {
+            id: that.selection[i].ID,
+            sum: that.selection[i].UnitPrice,
+            rate: 100,
+            price: that.selection[i].UnitPrice,
+            num: 1,
+            gg: that.selection[i].Standard,
+            projectName: that.selection[i].Name,
+            oldPrice: that.selection[i].UnitPrice,
+            type: "wz"
+          };
+          that.wzData.push(a);
+        }
+      } else {
+        // 项目
+        for (let i in that.selection) {
+          let a = {
+            id: that.selection[i].ID,
+            sum: that.selection[i].UnitPrice,
+            rate: 100,
+            num: 1,
+            price: that.selection[i].UnitPrice,
+            oldPrice: that.selection[i].UnitPrice,
+            lowPrice: that.selection[i].MinPrice,
+            highPrice: that.selection[i].MaxPirce,
+            gg: that.selection[i].Standard,
+            projectName: that.selection[i].Name,
+            canChangePrice: that.selection[i].CanChangePrice,
+            type: "xm"
+          };
+          that.xmData.push(a);
+        }
+      }
+      that.modal2 = false;
+      that.calSumMoney();
+    },
+    smallResetForm() {
+      let that = this;
+      that.modal2 = false;
+    },
+    showSmallModal(tabIndex) {
+      // 展示物资/项目弹窗
+      let that = this;
+      that.tabIndex = tabIndex;
+      that.searchKeyWord = "";
+      that.commit;
+      that.$store.commit("changeLoadingPage");
+      if (tabIndex == 1) {
+        that.getSalesProjectList();
+      } else {
+        that.getSalesGoodsList();
+      }
+      that.modal2 = true;
+    },
+    showRemark(row) {
+      // 显示备注
+      let that = this;
+      that.$Modal.info({
+        title: "备注详情",
+        content: row.Remark
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID,
+        startDate: that.formItem.startDate,
+        endDate: that.formItem.endDate,
+        CustomerName: that.formItem.userName,
+        CustomerPhone: that.formItem.userTel,
+        // phone: that.formItem.userTel,
+        page: that.tablePage.page,
+        size: that.tablePage.pageNum
+      };
+      // 转换日期
+      if (data.startDate) {
+        data.startDate = moment(data.startDate).format("YYYY-MM-DD");
+      }
+      if (data.endDate) {
+        data.endDate = moment(data.endDate).format("YYYY-MM-DD");
+      }
+      if (data.CustomerPhone) {
+        let regex = /^1\d{10}$/;
+        if (!regex.test(data.CustomerPhone)) {
+          that.$Message.error("电话号码格式有误");
+          return false;
+        }
+      }
+      that.tableLoading = true;
+      api.customerComeLogsGetList(data).then(response => {
+        if (response.error_code === "Success") {
+          let res = response.data;
+          for (let i of res.list) {
+            let phone = i.CustomerPhone;
+            i.CustomerPhone =
+              phone.substring(0, 3) + "****" + phone.substr(phone.length - 4);
+          }
+          that.list = res.list;
+          that.tableLoading = false;
+          that.$set(that.tablePage, "page", res.page);
+          that.$set(that.tablePage, "pageNum", res.size);
+          that.$set(that.tablePage, "allNum", res.total);
+          that.$set(that.tablePage, "maxPageNum", res.totalPage);
+          that.setPage();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    getSalesGoodsList() {
+      // 获取可销售物资列表
+      let that = this;
+      let data = {
+        page: 1,
+        size: 1000
+      };
+      api.getSalesGoods(data).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          that.materialsData = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getSalesProjectList() {
+      let that = this;
+      let data = {
+        page: 1,
+        size: 1000
+      };
+      api.getItemsByValid(data).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code === "Success") {
+          that.projectListData = response.data.list;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    getHandleList() {
+      // 获取开单人列表
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getEmployeesByEmployeeID(data).then(response => {
+        that.HandleList = response.data.list;
+      });
+    },
+    getHandle(event) {
+      // 保存开单人姓名
+      let that = this;
+      that.Handle = event.label;
+    },
+    calSumMoney() {
+      // 弹窗中计算物资、项目合计金额
+      let that = this;
+      let sum = 0;
+      if (that.xmData.length > 0) {
+        for (let i of that.xmData) {
+          sum += i.sum;
+        }
+      }
+
+      if (that.wzData.length > 0) {
+        for (let i of that.wzData) {
+          sum += i.sum;
+        }
+      }
+      that.calSum = sum;
+    },
+    formatData(num) {
+      // 四舍五入数据
+      let that = this;
+      let n = parseInt(num * 100 + 0.5) / 100;
+      return n;
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.checkAuthor();
+      that.initTableHeight();
+      that.getList();
+      // that.getHandleList()
+    });
+  },
+  activated() {
+    let that = this;
+    that.$nextTick(() => {
+      let phone = that.$route.params.phone;
+      if (phone) {
+        // 快捷菜单
+        that.searchTel.tel = phone;
+        that.poupSearchTel = true;
+        // that.$store.commit('changeLoadingPage')
+        setTimeout(() => {
+          that.searchCustomerTel();
+        }, 300);
+      }
+    });
+  },
+  filters: {
+    formatMoney(val) {
+      if (!val) {
+        return 0.0;
+      }
+      return Number(val).toFixed(2);
+    }
+  }
+};
+</script>
+<style>
+.dialog .ivu-modal-body {
+}
+
+.pannel-title i:hover {
+  cursor: pointer;
+  color: #94bb6d;
+}
+</style>

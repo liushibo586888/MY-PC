@@ -1,0 +1,407 @@
+<template>
+    <div class="kzqfl-container container">
+        <div class="search-box">
+            <Form :model="formItem" :label-width="0" inline @submit.native.prevent class="search-form" ref="searchForm">
+                <row :gutter="20">
+                    <!-- 仪器名称 -->
+                    <!-- <i-col span="3">
+                        <FormItem prop="name">
+                            <Input v-model="formItem.name" placeholder="名称"></Input>
+                        </FormItem>
+                    </i-col> -->
+                    <i-col span="24">
+                        <formItem class="btn-box">
+                            <!-- <Button type="primary" class="btn" @click="getList">搜索</Button> -->
+                            <!-- <Button type="warning" class="btn" @click="resetSearch">重置</Button> -->
+                            <i-button type="primary" class="btn btn-add" @click="showAddPoup" v-if="setAuthorAdd">添加</i-button>
+                            <i-button type="primary" class="btn btn-purple" @click="getDetail" v-if="setAuthorEdit" :disabled="!rowID">修改</i-button>
+                        </formItem>
+                    </i-col>
+                </row>
+            </Form>
+        </div>
+        <div class="table-box" id="tableBox">
+            <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+            <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" ref="mainTable" @on-current-change="getRowID"></Table>
+        </div>
+        <div class="bottom-box">
+            <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+            <!-- <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+            <i-button class="btn btn-prev" type="ghost">上一页</i-button>
+            <i-button class="btn btn-next" type="primary">下一页</i-button>
+            <div class="page-box">
+                <p>前往</p>
+                 <Input-number :max="99" :min="1" :value="1"></Input-number>
+                <p>页</p>
+            </div> -->
+        </div>
+        <!-- 新增弹窗 -->
+        <Modal :mask-closable="false" v-model="modal1" class="dialog" v-if="setAuthorAdd || setAuthorEdit">
+            <div slot='header' class="header">
+                {{modalTitle}}
+            </div>
+            <Form ref="formValidate1" :model="formValidate" :label-width="120" @submit.native.prevent class="form">
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="Name" label="分类名称：" :label-width="120" :rules="formValidateRule.Name">
+                            <Input v-model="formValidate.Name" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="IconUrl" label="图标路径：" :label-width="120" :rules="formValidateRule.IconUrl">
+                            <Input v-model="formValidate.IconUrl" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="Url" label="链接：" :label-width="120" :rules="formValidateRule.Url">
+                            <Input v-model="formValidate.Url" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="ComponentName" label="组件名称：" :label-width="120" :rules="formValidateRule.ComponentName">
+                            <Input v-model="formValidate.ComponentName" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="ComponentUrl" label="组件地址：" :label-width="120" :rules="formValidateRule.ComponentUrl">
+                            <Input v-model="formValidate.ComponentUrl" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="PlatformName" label="选择平台：" :label-width="120" :rules="formValidateRule.Terrace">
+                            <Select v-model="formValidate.PlatformName" placeholder="选择平台">
+                                <Option v-for="item in terraceList" :value="item.Name" :key="item.ID" @click.native="chooseTerrace(item.ID,item.Name)">{{ item.Name }}</Option>
+                            </Select>
+                        </FormItem>
+                    </i-col>
+                </row>
+                <row type="flex" justify="space-between">
+                    <i-col span="24">
+                        <FormItem prop="OrderNumber" label="序号：" :label-width="120" :rules="formValidateRule.OrderNumber">
+                            <Input v-model="formValidate.OrderNumber" placeholder="请输入"></Input>
+                        </FormItem>
+                    </i-col>
+                </row>
+            </Form>
+            <div slot="footer" class="footer">
+                <Button type="primary" class="btn" @click="addForm" :loading="loading">保存</Button>
+                <Button type="warning" class="btn" @click="resetForm" :loading="loading">取消</Button>
+            </div>
+        </Modal>
+        <!-- ** -->
+    </div>
+</template>
+<script>
+import { mapState } from "vuex";
+import superManager from "@/api/super.js";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    return {
+      rowID: null,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableLoading: false,
+      loading: false,
+      tableHeight: 200,
+      modalTitle: "修改",
+      phone: "",
+      modal1: false,
+      // 添加弹窗用
+      formValidate: {
+        Name: "",
+        Url: "",
+        OrderNumber: "",
+        IconUrl: "",
+        ComponentName: "",
+        ComponentUrl: "",
+        PlatformType: "",
+        PlatformName: ""
+      },
+      terraceList: echartsCommon.terraceList(),
+      formValidateRule: {
+        Name: { required: true, message: "仪器名称不得为空", trigger: "blur" },
+        ComponentName: {
+          required: true,
+          message: "组件名称不得为空",
+          trigger: "blur"
+        },
+        ComponentUrl: {
+          required: true,
+          message: "组件地址不得为空",
+          trigger: "blur"
+        },
+        Terrace: {
+          required: true,
+          message: "平台不得为空",
+          trigger: "blur"
+        }
+      },
+      formItem: {
+        name: ""
+      },
+      columns1: [
+        {
+          title: "排序序号",
+          key: "OrderNumber",
+          align: "center",
+          width: 100
+        },
+        {
+          title: "分类名称",
+          key: "Name",
+          align: "center"
+        },
+        {
+          title: "链接",
+          key: "URL",
+          align: "center"
+        },
+        {
+          title: "图标路径",
+          key: "IconUrl",
+          align: "center"
+        },
+        {
+          title: "组件名称",
+          key: "ComponentName",
+          align: "center"
+        },
+        {
+          title: "组件地址",
+          key: "ComponentUrl",
+          align: "center"
+        }
+      ],
+      list: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    },
+    setAuthorAdd() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      }
+      return false;
+    },
+    setAuthorEdit() {
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "修改") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      }
+      return false;
+    }
+  },
+  methods: {
+    chooseTerrace(id, name) {
+      let that = this;
+      that.formValidate.PlatformType = id;
+      that.formValidate.PlatformName = name;
+    },
+    showAddPoup() {
+      let that = this;
+      that.resetForm();
+      that.modal1 = true;
+      that.modalTitle = "新建";
+    },
+    resetSearch() {
+      let that = this;
+      that.$refs.searchForm.resetFields();
+      // that.getList()
+    },
+    searchCustomerTel() {
+      let that = this;
+      that.$refs.searchTelForm.validate(validate => {
+        if (validate) {
+          // 搜索...
+          that.$refs.searchTelForm.resetFields();
+          that.poupSearchTel = false;
+          that.modal1 = true;
+          that.modalTitle = "新增";
+        } else {
+          that.$Message.error("请输入用户的联系电话");
+        }
+      });
+    },
+    getRowID(row) {
+      let that = this;
+      that.rowID = row.ID;
+    },
+    getDetail(row) {
+      let that = this;
+      if (!that.rowID) {
+        that.$Message.error("请选择一条记录");
+        return false;
+      }
+      that.$store.commit("changeLoadingPage");
+      superManager.getControllerCategoriesDetail(that.rowID).then(response => {
+        that.$store.commit("changeLoadingPage");
+        if (response.error_code == "Success") {
+          that.formValidate = {
+            ID: response.data.ID,
+            Name: response.data.Name,
+            Url: response.data.URL,
+            OrderNumber: response.data.OrderNumber,
+            IconUrl: response.data.IconUrl,
+            ComponentName: response.data.ComponentName,
+            ComponentUrl: response.data.ComponentUrl,
+            PlatformType: response.data.PlatformType
+          };
+          that.formValidate.PlatformName = echartsCommon.PlatformName(
+            response.data.PlatformType
+          );
+          that.modal1 = true;
+          that.modalTitle = "修改";
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    modefyMessage(data) {
+      let that = this;
+      let d = {
+        Name: data.Name,
+        Url: data.Url,
+        OrderNumber: data.OrderNumber,
+        IconUrl: data.IconUrl,
+        ComponentName: data.ComponentName,
+        ComponentUrl: data.ComponentUrl,
+        PlatformType: data.PlatformType
+      };
+      superManager.modefyControllerCategories(data.ID, d).then(response => {
+        if (response.error_code === "Success") {
+          that.loading = false;
+          that.$Message.success("修改成功");
+          that.getList();
+          that.resetForm();
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.formValidate.ID = "";
+      that.modal1 = false;
+    },
+    addForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          that.loading = true;
+          if (that.formValidate.ID) {
+            that.modefyMessage(that.formValidate);
+            return false;
+          }
+          superManager
+            .addControllerCategories(that.formValidate)
+            .then(response => {
+              that.loading = false;
+              if (response.error_code === "Success") {
+                that.$Message.success("添加成功");
+                that.getList();
+                that.resetForm();
+              } else {
+                this.$Message.error("有必填项为空");
+              }
+            });
+        } else {
+          this.$Message.error("有必填项为空");
+        }
+      });
+    },
+    searchReset() {
+      let that = this;
+      that.$refs.searchTelForm.resetFields();
+      that.poupSearchTel = false;
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    getList() {
+      let that = this;
+      that.tableLoading = true;
+      superManager.getControllerCategoriesList().then(response => {
+        that.tableLoading = false;
+        if (response.error_code === "Success") {
+          let res = response.data;
+          that.list = res.list;
+          // that.page = res.page
+          // that.tablePage.pageNum = res.size
+          // that.tablePage.allNum = res.total
+          // that.setPage()
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+    });
+  }
+};
+</script>
+<style>
+</style>

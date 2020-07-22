@@ -1,0 +1,39 @@
+{
+    "error_code": "Success",
+    "error_message": null,
+    "data": {
+        "page": 1,
+        "size": 10,
+        "total": 8,
+        "totalPage": 1,
+        "list": [{
+                "ID": 1,
+                "SupNum": "000001",
+                "SupName": "宜昌市蓝霸光电节能科技有限公司",
+                "Phone": "1774546987",
+                "Email": "6548973@qq.com",
+                "Fax": "",
+                "Address": "杭州市",
+                "CusType": 0,
+                "IsDelete": 0,
+                "CreateTime": "2016-02-10T11:24:13.54",
+                "ContactName": "小妹妹",
+                "Remark": "活动深入访谈和"
+            },
+            {
+                "ID": 2,
+                "SupNum": "000002",
+                "SupName": "宜昌市彼岸软件有限责任公司",
+                "Phone": "1886526342",
+                "Email": "6548973@qq.com",
+                "Fax": "",
+                "Address": "亳州市",
+                "CusType": 0,
+                "IsDelete": 0,
+                "CreateTime": "2016-02-10T11:24:58.247",
+                "ContactName": "小姐姐",
+                "Remark": "鱼可以呼叫"
+            }
+        ]
+    }
+}

@@ -1,0 +1,981 @@
+import Main from '@/views/Main.vue';
+
+// 不作为Main组件的子页面展示的页面单独写，如下
+export const loginRouter = {
+    path: '/login',
+    name: 'login',
+    meta: {
+        title: 'Login - 登录'
+    },
+    component: () =>
+        import ('@/views/login.vue')
+};
+
+export const page404 = {
+    path: '/*',
+    name: 'error-404',
+    meta: {
+        title: '404-页面不存在'
+    },
+    component: () =>
+        import ('@/views/error-page/404.vue')
+};
+
+export const page403 = {
+    path: '/403',
+    meta: {
+        title: '403-权限不足'
+    },
+    name: 'error-403',
+    component: () =>
+        import ('@/views/error-page/403.vue')
+};
+
+export const page500 = {
+    path: '/500',
+    meta: {
+        title: '500-服务端错误'
+    },
+    name: 'error-500',
+    component: () =>
+        import ('@/views/error-page/500.vue')
+};
+
+export const preview = {
+    path: '/preview',
+    name: 'preview',
+    component: () =>
+        import ('@/views/form/article-publish/preview.vue')
+};
+
+export const locking = {
+    path: '/locking',
+    name: 'locking',
+    component: () =>
+        import ('@/views/main-components/lockscreen/components/locking-page.vue')
+};
+
+// 作为Main组件的子页面展示但是不在左侧菜单显示的路由写在otherRouter里
+export const otherRouter = {
+    path: '/',
+    name: 'otherRouter',
+    redirect: '/home',
+    component: Main,
+    children: [{
+            path: 'home',
+            title: {
+                i18n: 'home'
+            },
+            name: 'home_index',
+            component: () =>
+                import ('@/views/home/home.vue')
+        },
+        {
+            path: 'customerDetail',
+            title: '客户详情',
+            name: 'customerDetail',
+            component: () =>
+                import ('@/views/khgl/customerDetail.vue')
+        },
+        // { path: 'customerDetail1', title: '客户详情', name: 'customerDetail', component: () => import('@/views/khgl/customerDetail1.vue') }
+    ]
+};
+
+// 作为Main组件的子页面展示并且在左侧菜单显示的路由写在appRouter里
+export let appRouter = [{
+        path: '/customer',
+        icon: 'aaa-kehuguanli',
+        name: 'customer',
+        title: '客户管理',
+        component: Main,
+        children: [{
+                path: 'khgl',
+                title: '客户管理',
+                meta: {
+                    title: '客户管理'
+                },
+                name: 'khgl',
+                component: () =>
+                    import ('@/views/khgl/khgl.vue')
+            }, {
+                path: 'zxjl',
+                title: '咨询记录',
+                meta: {
+                    title: '咨询记录'
+                },
+                name: 'zxjl',
+                component: () =>
+                    import ('@/views/ywlc/zxjl.vue')
+            }, {
+                path: 'dddj',
+                title: '到店登记',
+                meta: {
+                    title: '到店登记',
+                    aaaa: true
+                },
+                name: 'dddj',
+                component: () =>
+                    import ('@/views/ywlc/dddj.vue')
+            }, {
+                path: 'yygn',
+                title: '预约客户',
+                meta: {
+                    title: '预约客户'
+                },
+                name: 'yygn',
+                component: () =>
+                    import ('@/views/ywlc/yygn.vue')
+            }, {
+                path: 'qdxd',
+                title: '渠道下单',
+                meta: {
+                    title: '渠道下单'
+                },
+                name: 'qdxd',
+                component: () =>
+                    import ('@/views/ywlc/qdxd.vue')
+            }, {
+                path: 'khzd',
+                title: '客户转店',
+                meta: {
+                    title: '客户转店',
+                    keepAlive: true
+                },
+                name: 'khzd',
+                component: () =>
+                    import ('@/views/jcxx/khzd.vue')
+            },
+            {
+                path: 'khzd1',
+                title: '转店审核',
+                meta: {
+                    title: '转店审核',
+                    keepAlive: true
+                },
+                name: 'khzd1',
+                component: () =>
+                    import ('@/views/jcxx/khzd1.vue')
+            }, {
+                path: 'customerTag',
+                title: '客户标签',
+                meta: {
+                    title: '客户标签',
+                    keepAlive: true
+                },
+                name: 'customerTag',
+                component: () =>
+                    import ('@/views/ywlc/customerTag.vue')
+            }, {
+                path: 'clubCard',
+                title: '会员卡信息',
+                meta: {
+                    title: '会员卡信息',
+                    keepAlive: true
+                },
+                name: 'clubCard',
+                component: () =>
+                    import ('@/views/khgl/clubCard.vue')
+            }, {
+                path: 'zfddcx',
+                title: '支付订单查询',
+                meta: {
+                    title: '支付订单查询',
+                    keepAlive: true
+                },
+                name: 'zfddcx',
+                component: () =>
+                    import ('@/views/khgl/zfddcx.vue')
+            }
+        ]
+    },
+    {
+        path: '/track',
+        icon: 'aaa-quanxian',
+        name: 'track',
+        title: '追踪客户',
+        component: Main,
+        children: [{
+            path: 'trackPlan',
+            title: '待追踪计划',
+            meta: {
+                title: '待追踪计划'
+            },
+            name: 'trackPlan',
+            component: () =>
+                import ('@/views/khgl/trackPlan.vue')
+        }, {
+            path: 'trackRecord',
+            title: '已追踪记录',
+            meta: {
+                title: '已追踪记录'
+            },
+            name: 'trackRecord',
+            component: () =>
+                import ('@/views/khgl/trackRecord.vue')
+        }]
+    },
+    {
+        path: '/charge',
+        icon: 'aaa-shoufeizhanshujushenhe',
+        name: 'charge',
+        title: '收费/退费',
+        component: Main,
+        children: [{
+                path: 'sf',
+                title: '收费',
+                meta: {
+                    title: '收费'
+                },
+                name: 'sf',
+                component: () =>
+                    import ('@/views/ywlc/sf.vue')
+            }, {
+                path: 'tf',
+                title: '退费',
+                meta: {
+                    title: '退费'
+                },
+                name: 'tf',
+                component: () =>
+                    import ('@/views/ywlc/tf.vue')
+            }, {
+                path: 'yjjcz',
+                title: '预交金充值',
+                meta: {
+                    title: '预交金充值'
+                },
+                name: 'yjjcz',
+                component: () =>
+                    import ('@/views/ywlc/yjjcz.vue')
+            }, {
+                path: 'yjjtf',
+                title: '预交金退费',
+                meta: {
+                    title: '预交金退费'
+                },
+                name: 'yjjtf',
+                component: () =>
+                    import ('@/views/ywlc/yjjtf.vue')
+            }, {
+                path: 'xmqz',
+                title: '项目确认单',
+                meta: {
+                    title: '项目确认单'
+                },
+                name: 'xmqz',
+                component: () =>
+                    import ('@/views/ywlc/xmqz.vue')
+            }, {
+                path: 'arrearsRecovery',
+                title: '欠款回收',
+                meta: {
+                    title: '欠款回收'
+                },
+                name: 'arrearsRecovery',
+                component: () =>
+                    import ('@/views/ywlc/arrearsRecovery.vue')
+            }, {
+                path: 'qianK',
+                title: '欠款列表',
+                meta: {
+                    title: '欠款列表'
+                },
+                name: 'qianK',
+                component: () =>
+                    import ('@/views/ywlc/qianK.vue')
+            }, {
+                path: 'jmje',
+                title: '减免列表',
+                meta: {
+                    title: '减免列表'
+                },
+                name: 'jmje',
+                component: () =>
+                    import ('@/views/ywlc/jmje.vue')
+            }, {
+                path: 'gmxm',
+                title: '购买项目列表',
+                meta: {
+                    title: '购买项目列表'
+                },
+                name: 'gmxm',
+                component: () =>
+                    import ('@/views/ywlc/gmxm.vue')
+            },
+            {
+                path: 'zswzSQD',
+                title: '赠送物资申请单 ',
+                meta: {
+                    title: '赠送物资申请单 '
+                },
+                name: 'zswzSQD',
+                component: () =>
+                    import ('@/views/ywlc/zswzSQD.vue')
+            }
+        ]
+    },
+    {
+        path: '/basicInformationManagement',
+        icon: 'aaa-jichuxinxishezhi',
+        name: 'basicInformationManagement',
+        title: '基础信息管理',
+        component: Main,
+        children: [{
+                path: 'PerformanceTarget',
+                title: '业绩目标',
+                meta: {
+                    title: '业绩目标'
+                },
+                name: 'PerformanceTarget',
+                component: () =>
+                    import ('@/views/jcxx/PerformanceTarget.vue')
+            },
+            {
+                path: 'yqgl',
+                title: '仪器管理',
+                meta: {
+                    title: '仪器管理'
+                },
+                name: 'yqgl',
+                component: () =>
+                    import ('@/views/jcxx/yqgl.vue')
+            }, {
+                path: 'lyqd',
+                title: '来源渠道管理',
+                meta: {
+                    title: '来源渠道管理'
+                },
+                name: 'lyqd',
+                component: () =>
+                    import ('@/views/jcxx/lyqd.vue')
+            },
+            {
+                path: 'wlly',
+                title: '网络来源管理',
+                meta: {
+                    title: '网络来源管理'
+                },
+                name: 'wlly',
+                component: () =>
+                    import ('@/views/jcxx/wlly.vue')
+            }, {
+                path: 'mdgl',
+                title: '门店管理',
+                meta: {
+                    title: '门店管理'
+                },
+                name: 'mdgl',
+                component: () =>
+                    import ('@/views/jcxx/mdgl.vue')
+            },
+            {
+                path: 'Payment',
+                title: '门店支付方式管理',
+                meta: {
+                    title: '门店支付方式管理'
+                },
+                name: 'Payment',
+                component: () =>
+                    import ('@/views/jcxx/Payment.vue')
+            },
+            {
+                path: 'ljtjgl',
+                title: '了解途径管理',
+                meta: {
+                    title: '了解途径管理'
+                },
+                name: 'ljtjgl',
+                component: () =>
+                    import ('@/views/jcxx/ljtjgl.vue')
+            },
+            {
+                path: 'hlsyj',
+                title: '护理师业绩目标',
+                meta: {
+                    title: '护理师业绩目标'
+                },
+                name: 'hlsyj',
+                component: () =>
+                    import ('@/views/jcxx/hlsyj.vue')
+            },
+            {
+                path: 'jlshenhe',
+                title: '经理审核',
+                meta: {
+                    title: '经理审核'
+                },
+                name: 'jlshenhe',
+                component: () =>
+                    import ('@/views/jcxx/jlshenhe.vue')
+            }
+        ]
+    },
+    {
+        path: '/finance',
+        icon: 'aaa-caiwuguanli',
+        name: 'finance',
+        title: '财务管理',
+        component: Main,
+        children: [{
+                path: 'mdzf',
+                title: '项目支付管理',
+                meta: {
+                    title: '项目支付管理'
+                },
+                name: 'mdzf',
+                component: () =>
+                    import ('@/views/cnjs/mdzf.vue')
+            },
+            {
+                path: 'cwyj',
+                title: '护理师手工数统计',
+                meta: {
+                    title: '护理师手工数统计'
+                },
+                name: 'cwyj',
+                component: () =>
+                    import ('@/views/cnjs/cwyj.vue')
+            },
+            {
+                path: 'cbhs',
+                title: '成本核算',
+                meta: {
+                    title: '成本核算'
+                },
+                name: 'cbhs',
+                component: () =>
+                    import ('@/views/cnjs/cbhs.vue')
+            },
+            {
+                path: 'khkc',
+                title: '客户库存',
+                meta: {
+                    title: '客户库存'
+                },
+                name: 'khkc',
+                component: () =>
+                    import ('@/views/cnjs/khkc.vue')
+            },
+            {
+                path: 'cnjs',
+                title: '出纳结算单',
+                meta: {
+                    title: '出纳结算单'
+                },
+                name: 'cnjs',
+                component: () =>
+                    import ('@/views/cnjs/cnjs.vue')
+            }, {
+                path: 'cwsr',
+                title: '财务收入总表',
+                meta: {
+                    title: '财务收入总表'
+                },
+                name: 'cwsr',
+                component: () =>
+                    import ('@/views/ygbb/cwsr.vue')
+            }, {
+                path: 'xfmx',
+                title: '消费明细总表',
+                meta: {
+                    title: '消费明细总表'
+                },
+                name: 'xfmx',
+                component: () =>
+                    import ('@/views/ygbb/xfmx.vue')
+            }, {
+                path: 'zfmx',
+                title: '支付明细表',
+                meta: {
+                    title: '支付明细表'
+                },
+                name: 'zfmx',
+                component: () =>
+                    import ('@/views/ygbb/zfmx.vue')
+            }, {
+                path: 'payMode',
+                title: '支付方式管理',
+                meta: {
+                    title: '支付方式管理'
+                },
+                name: 'payMode',
+                component: () =>
+                    import ('@/views/jcxx/payMode.vue')
+            }, {
+                path: 'srcb',
+                title: '收入成本报表',
+                meta: {
+                    title: '收入成本报表'
+                },
+                name: 'srcb',
+                component: () =>
+                    import ('@/views/cnjs/srcb.vue')
+            }
+        ]
+    },
+    {
+        path: '/operationManagement',
+        icon: 'aaa-zhcc_tiaoxuanwuzi',
+        name: 'operationManagement',
+        title: '运营管理',
+        component: Main,
+        children: [{
+            path: 'ygbb',
+            title: '运营管理',
+            meta: {
+                title: '运营管理'
+            },
+            name: 'ygbb_index',
+            component: () =>
+                import ('@/views/ygbb/ygbb.vue')
+        }]
+    },
+    {
+        path: '/reportCenter',
+        icon: 'aaa-baobiao1',
+        name: 'reportCenter',
+        title: '客户状态来人业绩表',
+        component: Main,
+        children: [{
+                path: 'dayin',
+                title: '打印报表',
+                meta: {
+                    title: '打印报表'
+                },
+                name: 'dayin',
+                component: () =>
+                    import ('@/views/reportCenter/dayin.vue')
+            },
+            {
+                path: 'customerPerformance',
+                title: '客户状态来人业绩表',
+                meta: {
+                    title: '客户状态来人业绩表'
+                },
+                name: 'customerPerformance',
+                component: () =>
+                    import ('@/views/reportCenter/customerPerformance.vue')
+            }, {
+                path: 'homeMakeUpReport',
+                title: '家居化妆品报表',
+                meta: {
+                    title: '家居化妆品报表'
+                },
+                name: 'homeMakeUpReport',
+                component: () =>
+                    import ('@/views/reportCenter/homeMakeUpReport.vue')
+            }, {
+                path: 'arrearsReport',
+                title: '欠款报表',
+                meta: {
+                    title: '欠款报表'
+                },
+                name: 'arrearsReport',
+                component: () =>
+                    import ('@/views/reportCenter/arrearsReport.vue')
+            },
+            {
+                path: 'jyshD',
+                title: '经营数据-单店',
+                meta: {
+                    title: '经营数据-单店'
+                },
+                name: 'jyshD',
+                component: () =>
+                    import ('@/views/reportCenter/jyshD.vue')
+            },
+            {
+                path: 'QYjysh',
+                title: '经营数据-区域',
+                meta: {
+                    title: '经营数据-区域'
+                },
+                name: 'QYjysh',
+                component: () =>
+                    import ('@/views/reportCenter/QYjysh1.vue')
+            },
+            {
+                path: 'ZJSJ',
+                title: '经营数据-单店汇总',
+                meta: {
+                    title: '经营数据-单店汇总'
+                },
+                name: 'ZJSJ',
+                component: () =>
+                    import ('@/views/reportCenter/ZJSJ.vue')
+            },
+            {
+                path: 'QYZBB',
+                title: '区域汇总报表',
+                meta: {
+                    title: '区域汇总报表'
+                },
+                name: 'QYZBB',
+                component: () =>
+                    import ('@/views/reportCenter/QYZBB.vue')
+            }
+        ]
+    },
+    {
+        path: '/execution',
+        icon: 'aaa-xiangmu',
+        name: 'execution',
+        title: '项目执行',
+        component: Main,
+        children: [{
+            path: 'xmzx',
+            title: '项目执行',
+            meta: {
+                title: '项目执行'
+            },
+            name: 'xmzx',
+            component: () =>
+                import ('@/views/ywlc/xmzx.vue')
+        }, {
+            path: 'zljl',
+            title: '护理记录',
+            meta: {
+                title: '护理记录'
+            },
+            name: 'zljl',
+            component: () =>
+                import ('@/views/ywlc/zljl.vue')
+        }]
+    },
+    {
+        path: '/StoreInvoicing',
+        icon: 'aaa-zhihang',
+        name: 'StoreInvoicing',
+        title: '门店进销存',
+        component: Main,
+        children: [{
+                path: 'Invoicing',
+                title: '门店进销存',
+                meta: {
+                    title: '门店进销存'
+                },
+                name: 'Invoicing',
+                component: () =>
+                    import ('@/views/Invoicing/Invoicing.vue')
+            },
+            {
+                path: 'Shenqing',
+                title: '申请单列表',
+                meta: {
+                    title: '申请单列表'
+                },
+                name: 'Shenqing',
+                component: () =>
+                    import ('@/views/Invoicing/Shenqing.vue')
+            },
+            {
+                path: 'changeKuwei',
+                title: '申请调库',
+                meta: {
+                    title: '申请调库'
+                },
+                name: 'changeKuwei',
+                component: () =>
+                    import ('@/views/Invoicing/changeKuwei.vue')
+            },
+            {
+                path: 'huodan',
+                title: '门店物资成本核算',
+                meta: {
+                    title: '门店物资成本核算'
+                },
+                name: 'huodan',
+                component: () =>
+                    import ('@/views/Invoicing/huodan.vue')
+            },
+            {
+                path: 'Pandian',
+                title: '盘点管理',
+                meta: {
+                    title: '盘点管理'
+                },
+                name: 'Pandian',
+                component: () =>
+                    import ('@/views/Invoicing/Pandian.vue')
+            },
+            // {
+            //     path: 'crkbb',
+            //     title: '出入库报表统计',
+            //     meta: {
+            //         title: '出入库报表统计'
+            //     },
+            //     name: 'crkbb',
+            //     component: () =>
+            //         import ('@/views/Invoicing/crkbb.vue')
+            // }
+        ]
+    },
+    {
+        path: '/employeeSchedule',
+        icon: 'aaa-biaoshilei_paibanrenyuan',
+        name: 'employeeSchedule',
+        title: '员工排班',
+        component: Main,
+        children: [{
+            path: 'workHour',
+            title: '工作时间段列表',
+            meta: {
+                title: '工作时间段列表'
+            },
+            name: 'workHour',
+            component: () =>
+                import ('@/views/jcxx/workHour.vue')
+        }, {
+            path: 'employeeScheduling',
+            title: '员工排班信息',
+            meta: {
+                title: '员工排班信息'
+            },
+            name: 'employeeScheduling',
+            component: () =>
+                import ('@/views/jcxx/employeeScheduling.vue')
+        }, {
+            path: 'monthlyScheduling',
+            title: '月排班表',
+            meta: {
+                title: '月排班表'
+            },
+            name: 'monthlyScheduling',
+            component: () =>
+                import ('@/views/jcxx/monthlyScheduling.vue')
+        }, {
+            path: 'waitingStaff',
+            title: '待排班员工',
+            meta: {
+                title: '待排班员工'
+            },
+            name: 'waitingStaff',
+            component: () =>
+                import ('@/views/jcxx/waitingStaff.vue')
+        }]
+    },
+    {
+
+        path: '/projectSupplies',
+        icon: 'aaa-icon_xiangmu',
+        title: '项目-物资管理',
+        name: 'projectSupplies',
+        component: Main,
+        children: [{
+                path: 'xmfl',
+                title: '项目分类',
+                meta: {
+                    title: '项目分类',
+                    keepAlive: true
+                },
+                name: 'xmfl',
+                component: () =>
+                    import ('@/views/jcxx/xmfl.vue')
+            }, {
+                path: 'xmgl',
+                title: '项目管理',
+                meta: {
+                    title: '项目管理'
+                },
+                name: 'xmgl',
+                component: () =>
+                    import ('@/views/jcxx/xmgl.vue')
+            }, {
+                path: 'wzgl',
+                title: '物资管理',
+                meta: {
+                    title: '物资管理'
+                },
+                name: 'wzgl',
+                component: () =>
+                    import ('@/views/jcxx/wzgl.vue')
+            },
+            {
+                path: 'wzyj',
+                title: '门店物资预警',
+                meta: {
+                    title: '门店物资预警'
+                },
+                name: 'wzyj',
+                component: () =>
+                    import ('@/views/jcxx/wzyj.vue')
+            },
+            {
+                path: 'wzxh',
+                title: '物资消耗列表',
+                meta: {
+                    title: '物资消耗列表'
+                },
+                name: 'wzxh',
+                component: () =>
+                    import ('@/views/jcxx/wzxh.vue')
+            }, {
+                path: 'wzglfl',
+                title: '物资管理分类',
+                meta: {
+                    title: '物资管理分类'
+                },
+                name: 'wzglfl',
+                component: () =>
+                    import ('@/views/jcxx/wzglfl.vue')
+            }, {
+                path: 'wzcjgl',
+                title: '物资厂家管理',
+                meta: {
+                    title: '物资厂家管理'
+                },
+                name: 'wzcjgl',
+                component: () =>
+                    import ('@/views/jcxx/wzcjgl.vue')
+            }, {
+                path: 'inStorage',
+                title: '入库管理',
+                meta: {
+                    title: '入库管理'
+                },
+                name: 'inStorage',
+                component: () =>
+                    import ('@/views/jcxx/inStorage.vue')
+            },
+            {
+                path: 'outStorage',
+                title: '出库管理',
+                meta: {
+                    title: '出库管理'
+                },
+                name: 'outStorage',
+                component: () =>
+                    import ('@/views/jcxx/outStorage.vue')
+            }
+        ]
+    },
+    {
+
+        path: '/employee',
+        icon: 'aaa-yuangongguanli',
+        title: '员工管理',
+        name: 'employee',
+        component: Main,
+        children: [{
+            path: 'yggl',
+            title: '员工管理',
+            meta: {
+                title: '员工管理'
+            },
+            name: 'yggl',
+            component: () =>
+                import ('@/views/jcxx/yggl.vue')
+        }, {
+            path: 'zwgl',
+            title: '职位管理',
+            meta: {
+                title: '职位管理'
+            },
+            name: 'zwgl',
+            component: () =>
+                import ('@/views/jcxx/zwgl.vue')
+        }, {
+            path: 'bmgl',
+            title: '部门管理',
+            meta: {
+                title: '部门管理'
+            },
+            name: 'bmgl',
+            component: () =>
+                import ('@/views/jcxx/bmgl.vue')
+        }, {
+            path: 'glgly',
+            title: '管理管理员',
+            meta: {
+                title: '管理管理员'
+            },
+            name: 'glgly',
+            component: () =>
+                import ('@/views/cg/glgly.vue')
+        }]
+    },
+    {
+        path: '/role',
+        icon: 'aaa-quanxian',
+        name: 'role',
+        title: '权限管理',
+        component: Main,
+        children: [{
+            path: 'qxgl',
+            title: '权限管理',
+            meta: {
+                title: '权限管理'
+            },
+            name: 'qxgl',
+            component: () =>
+                import ('@/views/jcxx/qxgl.vue')
+        }, {
+            path: 'kzqfl',
+            title: '控制器分类管理',
+            meta: {
+                title: '控制器分类管理'
+            },
+            name: 'kzqfl',
+            component: () =>
+                import ('@/views/cg/kzqfl.vue')
+        }, {
+            path: 'kzqgl',
+            title: '控制器管理',
+            meta: {
+                title: '控制器管理'
+            },
+            name: 'kzqgl',
+            component: () =>
+                import ('@/views/cg/kzqgl.vue')
+        }, {
+            path: 'dzgl',
+            title: '动作管理',
+            meta: {
+                title: '动作管理'
+            },
+            name: 'dzgl',
+            component: () =>
+                import ('@/views/cg/dzgl.vue')
+        }]
+    },
+    {
+        path: '/Log',
+        icon: 'aaa-bianji',
+        name: 'Log',
+        title: '日志管理',
+        component: Main,
+        children: [{
+                path: 'rizhi',
+                title: '编辑日志',
+                meta: {
+                    title: '编辑日志'
+                },
+                name: 'rizhi',
+                component: () =>
+                    import ('@/views/LogManager/rizhi.vue')
+            },
+            {
+                path: 'XGlog',
+                title: '编辑日志',
+                meta: {
+                    title: '编辑日志'
+                },
+                name: 'XGlog',
+                component: () =>
+                    import ('@/views/LogManager/XGlog.vue')
+            }
+        ]
+    }
+];
+// export let appRouter = []
+// 所有上面定义的路由都要写在下面的routers里
+export const routers = [
+    loginRouter,
+    otherRouter,
+    preview,
+    locking,
+    ...appRouter,
+    page500,
+    page403,
+    page404
+];

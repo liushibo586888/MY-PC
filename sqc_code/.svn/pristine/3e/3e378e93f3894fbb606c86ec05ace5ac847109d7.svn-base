@@ -1,0 +1,45 @@
+
+let echartSet={}
+echartSet.count=0;
+echartSet.defalutList=['#C1232B','#B5C334','#FE8463'];
+echartSet.colorList=[];
+echartSet.setColor=function(){
+    let count=echartSet.count;
+    if(count>0&&count<=3){
+        for (let index = 0; index <count; index++) {
+            echartSet.colorList.push(echartSet.defalutList[0]);
+        }
+      }else if(count>3){
+        echartSet.colorList=[echartSet.defalutList[0],echartSet.defalutList[0],echartSet.defalutList[0]];
+         if(count>=6)
+         {
+            for (let index =3; index < count; index++) {
+                if(index>=count-3){
+                    echartSet.colorList.push(echartSet.defalutList[2]);
+                }
+                else{
+                    echartSet.colorList.push(echartSet.defalutList[1]);
+                } 
+            }
+         }else{
+            echartSet.colorList.push(echartSet.defalutList[2]);
+         }
+      } 
+      return echartSet.colorList;
+};
+echartSet.itemStyle=function()
+{
+    return {
+        normal: {
+            color: function(params) {
+                return echartSet.setColor()[params.dataIndex];
+            },
+            label: {
+                show: true,
+                position: 'top',
+                formatter: '{c}'
+            }
+        }
+    }
+};
+export default echartSet

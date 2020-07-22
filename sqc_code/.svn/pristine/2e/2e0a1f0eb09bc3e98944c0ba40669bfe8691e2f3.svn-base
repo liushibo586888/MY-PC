@@ -1,0 +1,252 @@
+<template>
+  <div class="jyshD-container container">
+    <!-- 图表 -->
+    <div class="form-box">
+      <div class="charts">
+        <div class="header">
+          护理师业绩客户占比
+        </div>
+        <div class="content">
+          <tableLoadingPage :loading="spinShow"></tableLoadingPage>
+          <div id="data_source_com" class="forms"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+import moment from "moment";
+import { mapState } from "vuex";
+import api from "@/api/index.js";
+import echarts from "echarts";
+import echartsCommon from "@/api/Common.js";
+export default {
+  props: ["startDate", "endDate", "storeID"],
+  data() {
+    return {
+      spinShow: true,
+      list: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      authorList: state => state.app.authorList,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let h = 440;
+      if (window.innerHeight > 900) {
+        h = 540;
+      }
+      return h / 768 * window.innerHeight;
+    },
+    setAuthor() {
+      // 判断用户是否有查看客户详情权限
+      let that = this;
+      let pageName = that.$route.name;
+      let list = that.authorList[pageName];
+      if (list) {
+        for (let i of list) {
+          if (i.Name === "增加") {
+            return i.IsVisible;
+            break;
+          }
+        }
+      } else {
+        return false;
+      }
+    }
+  },
+  methods: {
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        let data = {
+          StartDate: that.startDate,
+          EndDate: that.endDate,
+          StoreID: that.storeID,
+          customerStatus: "",
+          EmployeeID: that.userMes.EmployeeID
+        };
+        data.StartDate = echartsCommon.changeTime(data.StartDate);
+        data.EndDate = echartsCommon.changeTime(data.EndDate);
+        that.tableLoading = true;
+        that.spinShow = true;
+        api
+          .getAllEmployeeCustomerTypePerformanceFromStore(data)
+          .then(response => {
+            that.tableLoading = false;
+            if (response.error_code === "Success") {
+              that.list = response.data;
+              that.setPieData();
+            } else {
+              that.$Message.error(response.error_message);
+            }
+          });
+      }, 100);
+    },
+    setPieData() {
+      let that = this;
+      let xinData = [];
+      let zhuiData = [];
+      let oldData = [];
+      let jiaData = [];
+      let barName = [];
+      let Heji = [];
+      let data3 = [];
+      for (let i in that.list) {
+        let a = {
+          NewCustomerFirstVisit: that.list[i].NewCustomerFirstVisit.toFixed(2),
+          NewCustomerFurtherConsulting: that.list[
+            i
+          ].NewCustomerFurtherConsulting.toFixed(2),
+          OldCustomer: that.list[i].OldCustomer.toFixed(2),
+          Value4: that.list[i].Value4.toFixed(2),
+          Name: that.list[i].Name
+        };
+        xinData.push(a.NewCustomerFirstVisit);
+        zhuiData.push(a.NewCustomerFurtherConsulting);
+        oldData.push(a.OldCustomer);
+        jiaData.push(a.Value4);
+        barName.push(a.Name);
+        Heji.push(
+          Number(a.NewCustomerFirstVisit) +
+            Number(a.NewCustomerFurtherConsulting) +
+            Number(a.OldCustomer) +
+            Number(a.Value4)
+        );
+        for (let i = 0; i < Heji.length; i++) {
+          let a = {
+            value: Heji[i].toFixed(2),
+            xAxis: i,
+            yAxis: Heji[i].toFixed(2)
+          };
+          data3.push(a);
+        }
+      }
+      that.setEcharts(xinData, zhuiData, oldData, jiaData, barName, data3);
+    },
+    setEcharts(xinData, zhuiData, oldData, jiaData, barName, data3) {
+      let that = this;
+      that.$nextTick(() => {
+        var dataSourcePie = echarts.init(
+          document.getElementById("data_source_com")
+        );
+        let optionPie = {
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              // 坐标轴指示器，坐标轴触发有效
+              type: "shadow" // 默认为直线，可选为：'line' | 'shadow'
+            }
+          },
+          legend: {
+            data: ["新客", "跟踪客", "护理客", "家居产品"]
+          },
+          grid: {
+            left: "3%",
+            right: "4%",
+            bottom: "3%",
+            containLabel: true
+          },
+          yAxis: {
+            type: "value"
+          },
+          xAxis: {
+            type: "category",
+            data: barName
+          },
+          series: [
+            {
+              name: "新客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: xinData
+            },
+            {
+              name: "跟踪客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: zhuiData
+            },
+            {
+              name: "护理客",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: oldData
+            },
+            {
+              name: "家居产品",
+              type: "bar",
+              stack: "总量",
+              label: {
+                normal: {
+                  show: true,
+                  position: "insideRight"
+                }
+              },
+              data: jiaData,
+              markPoint: {
+                symbol: "pin", //标记类型
+                symbolSize: 60, //图形大小symbolSize:[50, 50],// 容器大小  symbolOffset:[0,-20],//位置偏移
+                itemStyle: {
+                  normal: {
+                    color: "black",
+                    // borderColor: "#fff",
+                    borderWidth: 0, // 标注边线线宽，单位px，默认为1
+                    label: {
+                      show: true
+                    }
+                  }
+                },
+                data: data3
+              }
+            }
+          ]
+        };
+        dataSourcePie.setOption(optionPie, true);
+        that.spinShow = false;
+        window.addEventListener("resize", function() {
+          dataSourcePie.resize();
+        });
+      });
+    }
+  },
+  mounted() {
+    let that = this;
+    that.getList();
+  },
+  watch: {
+    startDate(val, oldVal) {
+      this.getList();
+    },
+    endDate(val1, oldVal1) {
+      this.getList();
+    },
+    storeID(val2, oldVal2) {
+      this.getList();
+    }
+  }
+};
+</script>
+<style>
+</style>

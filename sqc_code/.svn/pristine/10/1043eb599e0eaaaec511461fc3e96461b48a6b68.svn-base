@@ -1,0 +1,400 @@
+<template>
+  <div class="zfmx-container container">
+    <div class="search-box">
+      <Form :model="formItem" :label-width="0" inline @submit.native.prevent ref="searchForm" class="search-form">
+        <row :gutter="20">
+          <i-col span="3">
+            <formItem prop="StartDate">
+              <DatePicker type="date" placeholder="开始日期" class="DatePicker_time" :options="options1" v-model="formItem.StartDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <formItem prop="EndDate">
+              <DatePicker type="date" placeholder="结束日期" class="DatePicker_time" :options="options1" v-model="formItem.EndDate" :clearable="false" :editable="false"></DatePicker>
+            </formItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="store">
+              <Select v-model="formItem.store" placeholder="门店" :filterable="true">
+                <!-- <Option value="all" @click.native="choose()">所有</Option> -->
+                <Option v-for="item in storeList" :value="item.Name" :key="item.ID" @click.native="choose(item.Name,item.ID)">{{ item.Name }}</Option>
+              </Select>
+            </FormItem>
+          </i-col>
+          <i-col span="3">
+            <FormItem prop="CustomerName">
+              <Input v-model="formItem.CustomerName" placeholder="姓名或电话"></Input>
+            </FormItem>
+          </i-col>
+          <i-col span="12">
+            <formItem class="btn-box">
+              <Button type="primary" class="btn btn-search" @click="searchForm">搜索</Button>
+              <Button type="warning" class="btn btn-reset" @click="resetSearch">重置</Button>
+              <!-- <Button type="success" class="btn btn-search" @click="modal1=true" :disabled='Stopuse'>审阅</Button> -->
+              <!-- <Button type="error" class="btn btn-reset" @click="resetSearch">修改</Button> -->
+            </formItem>
+          </i-col>
+        </row>
+      </Form>
+    </div>
+    <div class="table-box" id="tableBox">
+      <Table :columns="columns1" :data="list" highlight-row :height="setTableHeight" :row-class-name="rowClassName" ref="mainTable" @on-row-click="clickChange"></Table>
+      <tableLoadingPage :loading="tableLoading"></tableLoadingPage>
+    </div>
+    <div class="bottom-box">
+      <i-button class="btn-export" @click="exportTable" type="default">导出</i-button>
+      <Select v-model="tablePage.pageNum" class="table-row" placement="top" @on-change="changePage">
+        <Option :value="item.ID" v-for="(item, index) in tableRows" :key="index">{{item.Name}}</Option>
+      </Select>
+
+      <div class="row-box">{{tablePage.startNum}} - {{tablePage.endNum}}条/共{{tablePage.allNum}}条</div>
+      <i-button class="btn btn-prev" type="ghost" @click="prevPage()">上一页</i-button>
+      <i-button class="btn btn-next" type="primary" @click="nextPage()">下一页</i-button>
+      <div class="page-box">
+        <p>前往</p>
+        <Input-number :max="tablePage.maxPageNum" :min="1" v-model="tablePage.page" @on-change="changePage"></Input-number>
+        <p>页</p>
+      </div>
+    </div>
+    <Modal v-model="modal1" @on-ok="ok" @on-cancel="cancel">
+      <p style="text-align:center;fontSize:15px; font-weight:900">确定要审阅吗?</p>
+    </Modal>
+  </div>
+</template>
+<script>
+import api from "@/api/index.js";
+import { mapState } from "vuex";
+import moment from "moment";
+import echartsCommon from "@/api/Common.js";
+export default {
+  data() {
+    return {
+      options1: echartsCommon.shortcuts(), //时间回到今天
+      modal1: false,
+      Stopuse: true,
+      rowID: "",
+      tableLoading: true,
+      tablePage: {
+        page: 1,
+        pageNum: 10,
+        maxPageNum: 100,
+        allNum: 199,
+        startNum: 0,
+        endNum: 0
+      },
+      tableHeight: 40,
+      formItem: {
+        CustomerName: "",
+        StartDate: new Date(),
+        EndDate: new Date(),
+        StoreID: null,
+        EmployeeID: "",
+        store: "",
+        page: "",
+        size: ""
+      },
+      columns1: [
+        {
+          title: "门店",
+          key: "StoreName",
+          align: "center"
+        },
+        {
+          title: "创建时间",
+          key: "CreateTime",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.CreateTime) {
+              return h("div", {}, "");
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.CreateTime).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: "客户姓名",
+          key: "UserName",
+          align: "center"
+        },
+        {
+          title: "项目名称",
+          key: "ItemName",
+          align: "center"
+        },
+        {
+          title: "审核人",
+          key: "EmployeeName",
+          align: "center"
+        },
+        {
+          title: "客户电话",
+          key: "Phone",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.Phone) {
+              return "";
+            }
+            let tel =
+              params.row.Phone.substring(0, 3) +
+              "****" +
+              params.row.Phone.substring(-1, 4);
+            return tel;
+          }
+        },
+        {
+          title: "减免金额",
+          key: "Money",
+          align: "center"
+        },
+        {
+          title: "审阅时间",
+          key: "UpdateDate",
+          align: "center",
+          render: (h, params) => {
+            if (!params.row.UpdateDate) {
+              return h("div", {}, "");
+            }
+            return h(
+              "div",
+              {},
+              moment(params.row.UpdateDate).format("YYYY-MM-DD")
+            );
+          }
+        },
+        {
+          title: "状态",
+          key: "Status",
+          align: "center",
+          render: (h, params) => {
+            return h("div", {}, params.row.Status == 1 ? "未审核" : "已审核");
+          }
+        },
+        {
+          title: "审核意见",
+          key: "Remark",
+          align: "center"
+        },
+        {
+          title: " ",
+          key: "",
+          align: "center"
+        }
+      ],
+      list: [],
+      storeList: []
+    };
+  },
+  computed: {
+    ...mapState({
+      userMes: state => state.app.userMes,
+      tableRows: state => state.app.tableRows
+    }),
+    setTableHeight() {
+      let that = this;
+      return that.tableHeight;
+    }
+  },
+  methods: {
+    rowClassName(row) {
+      // console.log(row);
+      // for (let i = 0; i < row.DtlSconto.length; i++) {
+      if (row.Status == 1) {
+        return "demo-table-info-row";
+      }
+      return "";
+      // }
+    },
+    clickChange(row) {
+      let that = this;
+      that.rowID = row.Id;
+      if (that.rowID) {
+        that.Stopuse = false;
+      }
+    },
+    ok() {
+      let that = this;
+      let data = {
+        EmployeeId: that.userMes.EmployeeID,
+        StoreId: that.formItem.StoreID,
+        Id: that.rowID
+      };
+      api.consumptionsAudit(data).then(response => {
+        if (response.error_code === "Success") {
+          that.getList();
+          that.$Message.error(response.data);
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    cancel() {},
+    searchForm() {
+      // 搜索表格
+      let that = this;
+      //判断两个时间段大小
+      
+      if (
+        echartsCommon.ContrastTime(
+          this.$Message,
+          that.formItem.StartDate,
+          that.formItem.EndDate
+        )
+      ) {
+        that.tablePage.page = 1;
+        that.getList();
+      }
+      //------------------
+    },
+    resetSearch() {
+      let that = this;
+      that.tablePage.page = 1;
+      that.$refs.searchForm.resetFields();
+      that.getList();
+    },
+    resetForm() {
+      let that = this;
+      that.$refs.formValidate1.resetFields();
+      that.modal1 = false;
+    },
+    addForm() {
+      let that = this;
+      that.$refs.formValidate1.validate(validate => {
+        if (validate) {
+          that.$Message.success("添加成功");
+          that.$refs.formValidate1.resetFields();
+          that.modal1 = false;
+        } else {
+          this.$Message.error("姓名不得为空");
+        }
+      });
+    },
+    initTableHeight() {
+      let that = this;
+      that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      window.onresize = function() {
+        that.tableHeight = document.getElementById("tableBox").offsetHeight;
+      };
+    },
+    setPage() {
+      let that = this;
+      let teblePage = that.tablePage;
+      teblePage.startNum = teblePage.pageNum * (teblePage.page - 1) + 1;
+      let endPage = teblePage.page * teblePage.pageNum;
+      teblePage.endNum =
+        endPage > teblePage.allNum ? teblePage.allNum : endPage;
+    },
+    prevPage() {
+      let that = this;
+      if (that.tablePage.page <= 1) {
+        that.$Message.error("已经是第一页");
+        return false;
+      }
+      that.tablePage.page--;
+      that.getList();
+    },
+    nextPage() {
+      let that = this;
+      if (that.tablePage.page >= that.tablePage.maxPageNum) {
+        that.$Message.error("已经是最后一页");
+        return false;
+      }
+      that.tablePage.page++;
+      that.getList();
+    },
+    changePage() {
+      let that = this;
+      that.getList();
+    },
+    getList() {
+      setTimeout(() => {
+        let that = this;
+        // let userMessage = JSON.parse(localStorage.userMessage);
+        // that.formItem.EmployeeID = userMessage.EmployeeID;
+        that.formItem.page = that.tablePage.page;
+        that.formItem.size = that.tablePage.pageNum;
+        let data = {
+          EmployeeId: that.userMes.EmployeeID,
+          StoreId: that.formItem.StoreID,
+          StartDate: that.formItem.StartDate,
+          EndDate: that.formItem.EndDate,
+          Key: that.formItem.CustomerName,
+          PageIndex: that.formItem.page,
+          PageSize: that.formItem.size
+        };
+        if (data.StartDate) {
+          data.StartDate = moment(data.StartDate).format("YYYY-MM-DD");
+          that.formItem.StartDate = data.StartDate;
+        }
+        if (data.EndDate) {
+          data.EndDate = moment(data.EndDate).format("YYYY-MM-DD");
+          that.formItem.EndDate = data.EndDate;
+        }
+        that.tableLoading = true;
+        api.consumptionsReadList(data).then(response => {
+          if (response.error_code === "Success") {
+            let res = response.data;
+            that.list = res.list;
+            that.tableLoading = false;
+            that.page = res.page;
+            that.tablePage.allNum = res.total;
+            that.tablePage.maxPageNum = res.totalPage;
+            that.setPage();
+          } else {
+            that.$Message.error(response.error_message);
+          }
+        });
+      }, 100);
+    },
+    exportTable() {
+      let that = this;
+      that.$refs.mainTable.exportCsv({
+        filename: `${new Date().getTime()}${document.title}`
+      });
+    },
+    // 获取有效门店
+    getStore() {
+      let that = this;
+      let data = {
+        EmployeeID: that.userMes.EmployeeID
+      };
+      api.getValidStoresNew(data).then(response => {
+        if (response.error_code === "Success") {
+          that.storeList = response.data.list;
+          // that.formItem.store = that.userMes.StoreName;
+          // that.formItem.StoreID = that.userMes.StoreID;
+          that.formItem.store = that.storeList[0].Name;
+          that.formItem.StoreID = that.storeList[0].ID;
+        } else {
+          that.$Message.error(response.error_message);
+        }
+      });
+    },
+    choose(name, id) {
+      //   if (name === undefined && id === undefined) {
+      //     this.formItem.store = "所有";
+      //     this.formItem.StoreID = null;
+      //   } else {
+      this.formItem.store = name;
+      this.formItem.StoreID = id;
+      //   }
+    }
+  },
+  mounted() {
+    let that = this;
+    that.$nextTick(() => {
+      that.initTableHeight();
+      that.getList();
+      that.getStore();
+    });
+  }
+};
+</script>
+<style>
+.ivu-table .demo-table-info-row td {
+  background-color: rgb(236, 162, 177);
+}
+</style>
+
