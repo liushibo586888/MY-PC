@@ -30,7 +30,7 @@
     "iview-area": "^1.5.16",
     "js-cookie": "^2.2.0",
     "lib-flexible": "^0.3.2",
-    "moment": "^2.22.0",
+    "moment": "^2.29.2",
     "px2rem-loader": "^0.1.9",
     "rasterizehtml": "^1.2.4",
     "simplemde": "^1.11.2",
